@@ -5,10 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Red Ball Guide - Mobile Optimized</title>
+    <title>Red Ball Guide - Responsive 3D</title>
     <style>
         :root {
-            --ui-bg: rgba(0, 0, 0, 0.85);
+            --ui-bg: rgba(0, 0, 0, 0.9);
             --wire-color: rgba(255, 255, 255, 0.8);
             --accent-red: #FF3333;
             --accent-green: #33FF33;
@@ -25,7 +25,6 @@
             background-color: #000;
             font-family: 'Courier New', Courier, monospace;
             touch-action: none;
-            /* 防止スワイプ揺れ */
             -webkit-user-select: none;
             user-select: none;
         }
@@ -33,10 +32,13 @@
         #container {
             width: 100%;
             height: 75%;
-            /* 画面上部75%をゲームに */
             position: absolute;
             top: 0;
             left: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
         }
 
         #control-panel {
@@ -45,7 +47,6 @@
             left: 0;
             width: 100%;
             height: 25%;
-            /* 画面下部25% */
             background: var(--ui-bg);
             border-top: 1px solid var(--wire-color);
             display: flex;
@@ -60,19 +61,15 @@
         .action-group {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 10px;
         }
 
         .dpad {
             display: grid;
-            grid-template-areas:
-                ". up ."
-                "left . right"
-                ". down .";
-            gap: 5px;
+            grid-template-areas: ". . ." "left . right" ". . .";
+            gap: 10px;
         }
 
-        /* 今回は左右移動のみだが将来的に上下も対応可能なD-Pad構成 */
         #btnLeft {
             grid-area: left;
         }
@@ -82,7 +79,7 @@
         }
 
         button {
-            min-width: 60px;
+            min-width: 70px;
             min-height: 50px;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--wire-color);
@@ -104,8 +101,8 @@
         }
 
         .primary-btn {
-            padding: 10px 20px;
-            font-size: 18px;
+            padding: 12px 20px;
+            font-size: 16px;
             letter-spacing: 2px;
         }
 
@@ -125,13 +122,12 @@
             width: 100%;
             text-align: center;
             color: var(--wire-color);
-            font-size: 20px;
+            font-size: 18px;
             letter-spacing: 3px;
             pointer-events: none;
             z-index: 10;
         }
 
-        /* D-Pad 矢印ワイヤーデザイン */
         .arrow-icon {
             width: 0;
             height: 0;
@@ -175,10 +171,15 @@
 
     <script>
         /**
-         * RED BALL GUIDE - Mobile Optimized Prototype
+         * RED BALL GUIDE - Responsive Mobile Prototype (Refined)
          */
 
+        // Game Area Specs - Adjusted for padding to ensure walls (at +/- 10.5) fit
+        const PLAY_AREA_W = 22;
+        const PLAY_AREA_H = 13.5;
+        const PLAY_ASPECT = PLAY_AREA_W / PLAY_AREA_H;
         const GRID_SIZE = 2;
+
         let scene, camera, renderer, world;
         let ball, ballBody, ballStartPos = { x: -8, y: 5 };
         let slope, slopeBody, slopePos = { x: 0, y: -2 }, slopeRotation = 0;
@@ -186,23 +187,25 @@
         let goalRegion = { minX: 5.5, maxX: 8.5, minY: -5.5, maxY: -4 };
 
         function init() {
-            // Three.js
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x000000);
 
             const container = document.getElementById('container');
             const w = container.clientWidth;
             const h = container.clientHeight;
-            const aspect = w / h;
-            const d = 10;
-            camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+
+            // Camera Setup
+            camera = new THREE.OrthographicCamera(-11, 11, 6.75, -6.75, 1, 1000);
             camera.position.set(0, 0, 20);
             camera.lookAt(0, 0, 0);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(w, h);
             renderer.setPixelRatio(window.devicePixelRatio);
+            // Ensure canvas is centered within the flex container
+            renderer.domElement.style.display = 'block';
             container.appendChild(renderer.domElement);
+
+            updateCameraSize();
 
             // Lighting
             scene.add(new THREE.AmbientLight(0xffffff, 0.4));
@@ -218,21 +221,42 @@
             setupStage();
             setupBall();
             setupSlope();
-            setupControls();
+            setupEvents();
 
             animate();
-
             document.getElementById('status').innerText = "CALIBRATE SLOPE";
+        }
+
+        function updateCameraSize() {
+            const container = document.getElementById('container');
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            const screenAspect = w / h;
+
+            if (screenAspect > PLAY_ASPECT) {
+                // Window is wider than play area aspect: Fit by height
+                const frustumW = PLAY_AREA_H * screenAspect;
+                camera.left = -frustumW / 2;
+                camera.right = frustumW / 2;
+                camera.top = PLAY_AREA_H / 2;
+                camera.bottom = -PLAY_AREA_H / 2;
+            } else {
+                // Window is narrower than play area aspect: Fit by width
+                const frustumH = PLAY_AREA_W / screenAspect;
+                camera.left = -PLAY_AREA_W / 2;
+                camera.right = PLAY_AREA_W / 2;
+                camera.top = frustumH / 2;
+                camera.bottom = -frustumH / 2;
+            }
+
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
         }
 
         function createWireBox(w, h, x, y, color = 0xFFFFFF) {
             const geo = new THREE.BoxGeometry(w, h, 2);
             const edges = new THREE.EdgesGeometry(geo);
-            const mat = new THREE.LineBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.8
-            });
+            const mat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.8 });
             const line = new THREE.LineSegments(edges, mat);
             line.position.set(x, y, 0);
             scene.add(line);
@@ -241,15 +265,12 @@
             body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, 1)));
             body.position.set(x, y, 0);
             world.addBody(body);
-            return { mesh: line, body: body };
         }
 
         function setupStage() {
-            //Floor
-            createWireBox(20, 1, 0, -5.5);
-            //Walls
-            createWireBox(1, 12, -10.5, 0);
-            createWireBox(1, 12, 10.5, 0);
+            createWireBox(20, 1, 0, -5.5); // Floor
+            createWireBox(1, 12, -10.5, 0); // Wall L
+            createWireBox(1, 12, 10.5, 0); // Wall R
 
             // Goal (Yellow)
             const goalGeo = new THREE.BoxGeometry(3, 1, 2);
@@ -261,18 +282,12 @@
         }
 
         function setupBall() {
-            // Visual: Matte Red Ball
             const geo = new THREE.SphereGeometry(0.5, 32, 32);
-            const mat = new THREE.MeshStandardMaterial({
-                color: 0xFF0000,
-                roughness: 0.8,
-                metalness: 0.2
-            });
+            const mat = new THREE.MeshStandardMaterial({ color: 0xFF0000, roughness: 0.8, metalness: 0.2 });
             ball = new THREE.Mesh(geo, mat);
             ball.position.set(ballStartPos.x, ballStartPos.y, 0);
             scene.add(ball);
 
-            // Physics
             ballBody = new CANNON.Body({
                 mass: 1,
                 shape: new CANNON.Sphere(0.5),
@@ -284,13 +299,9 @@
 
         function setupSlope() {
             const shape = new THREE.Shape();
-            shape.moveTo(0, 0);
-            shape.lineTo(2, 0);
-            shape.lineTo(0, 2);
-            shape.lineTo(0, 0);
-
+            shape.moveTo(0, 0); shape.lineTo(2, 0); shape.lineTo(0, 2); shape.lineTo(0, 0);
             const geo = new THREE.ExtrudeGeometry(shape, { depth: 2, bevelEnabled: false });
-            geo.translate(-1, -1, -1); // Center the pivot
+            geo.translate(-1, -1, -1);
 
             const edges = new THREE.EdgesGeometry(geo);
             const mat = new THREE.LineBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8 });
@@ -298,7 +309,6 @@
             slope.position.set(slopePos.x, slopePos.y, 0);
             scene.add(slope);
 
-            // Physics Triangle
             const v = [
                 new CANNON.Vec3(-1, -1, -1), new CANNON.Vec3(1, -1, -1), new CANNON.Vec3(-1, 1, -1),
                 new CANNON.Vec3(-1, -1, 1), new CANNON.Vec3(1, -1, 1), new CANNON.Vec3(-1, 1, 1)
@@ -350,7 +360,6 @@
             document.getElementById('status').innerText = "CALIBRATE SLOPE";
             document.getElementById('status').style.color = "var(--wire-color)";
 
-            // Complete physical reset
             ballBody.type = CANNON.Body.KINEMATIC;
             ballBody.position.set(ballStartPos.x, ballStartPos.y, 0);
             ballBody.velocity.set(0, 0, 0);
@@ -361,20 +370,11 @@
             ball.quaternion.copy(ballBody.quaternion);
         }
 
-        function setupControls() {
+        function setupEvents() {
             const bind = (id, fn) => {
                 const el = document.getElementById(id);
-                // touchstart で即応性確保
-                el.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    fn();
-                }, { passive: false });
-                // マウス操作用
-                el.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    //すでtouchstartで処理されている場合は二重実行を防ぐロジックが必要だが、
-                    //PCブラウザ互換性のために単純に定義
-                });
+                el.addEventListener('touchstart', (e) => { e.preventDefault(); fn(); }, { passive: false });
+                el.addEventListener('click', (e) => { e.preventDefault(); fn(); });
             };
 
             bind('btnLeft', () => handleMove(-1));
@@ -382,19 +382,7 @@
             bind('rotateBtn', handleRotate);
             bind('playBtn', togglePlay);
 
-            window.addEventListener('resize', () => {
-                const container = document.getElementById('container');
-                const w = container.clientWidth;
-                const h = container.clientHeight;
-                const aspect = w / h;
-                const d = 10;
-                camera.left = -d * aspect;
-                camera.right = d * aspect;
-                camera.top = d;
-                camera.bottom = -d;
-                camera.updateProjectionMatrix();
-                renderer.setSize(w, h);
-            });
+            window.addEventListener('resize', updateCameraSize);
         }
 
         function animate() {
@@ -411,7 +399,6 @@
                     document.getElementById('status').style.color = "var(--accent-yellow)";
                 }
 
-                // Fail Check
                 if (ball.position.y < -10) {
                     document.getElementById('status').innerText = "OUT OF BOUNDS";
                     document.getElementById('status').style.color = "var(--accent-red)";
@@ -421,7 +408,6 @@
         }
 
         window.onload = init;
-        // スクロール等のデフォルト動作をグローバルに禁止
         document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
     </script>
