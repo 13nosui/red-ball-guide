@@ -108,7 +108,6 @@ function GameUI() {
 
 /**
  * 3. RESPONSIVE CAMERA LOGIC (修正版)
- * 画面の比率にかかわらず、常に一定の「横幅」が映るようにカメラ距離を自動計算する
  */
 function ResponsiveCamera() {
     const { camera, size } = useThree();
@@ -117,16 +116,14 @@ function ResponsiveCamera() {
         const aspect = size.width / size.height;
         const fov = 60;
 
-        // 画面内に収めたいステージの横幅（単位:メートル）
-        // これを増やすと、より広範囲が映る（カメラが遠ざかる）
-        const targetVisibleWidth = 26;
+        // ▼▼▼ 修正箇所 ▼▼▼
+        // 以前は26でしたが、これを「14」にしてズームインします。
+        // これにより、画面幅いっぱいが「14メートル（ブロック14個分）」になり、大きく表示されます。
+        const targetVisibleWidth = 14;
+        // ▲▲▲ 修正箇所 ▲▲▲
 
-        // 視野角(FOV)とアスペクト比から、必要なカメラ距離を逆算する公式
-        // distance = (width / 2) / (tan(fov/2) * aspect)
         const distance = (targetVisibleWidth / 2) / (Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect);
 
-        // カメラ位置を更新（高さYと奥行きZを同じにして45度見下ろしを維持）
-        // 見下ろし角度を変えずに距離だけ調整
         camera.position.set(0, distance, distance);
         camera.lookAt(0, 0, 0);
         camera.updateProjectionMatrix();
@@ -146,14 +143,12 @@ export default function App() {
         <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000', overflow: 'hidden', position: 'relative' }}>
             <Canvas shadows gl={{ antialias: false, pixelRatio: 1 }}>
 
-                {/* カメラの初期設定 (ResponsiveCameraで上書きされるが、初期値として遠くに置いておく) */}
                 <PerspectiveCamera
                     makeDefault
                     position={[0, 20, 20]}
                     fov={60}
                 />
 
-                {/* レスポンシブ制御 */}
                 <ResponsiveCamera />
 
                 <OrbitControls
