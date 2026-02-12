@@ -6,7 +6,6 @@ import { useStore } from '../store/useStore';
 export function Experience() {
     return (
         <>
-            {/* 背景色: タイルの色と合わせて境界をなじませる */}
             <color attach="background" args={['#dcdcdc']} />
 
             <ambientLight intensity={0.7} />
@@ -20,10 +19,7 @@ export function Experience() {
             <Physics gravity={[0, -9.81, 0]}>
                 <Player />
                 <InvisibleFloor />
-
-                {/* 修正版: limitを設定した巨大タイル床 */}
                 <InfiniteTileFloor />
-
                 <MovableSlope />
                 <Goal />
             </Physics>
@@ -50,11 +46,8 @@ function InvisibleFloor() {
     );
 }
 
-/**
- * インスタンス描画を使った巨大なタイル床
- */
 function InfiniteTileFloor() {
-    const size = 60; // 60x60 = 3600枚
+    const size = 60;
     const half = size / 2;
 
     const tileData = [];
@@ -66,8 +59,6 @@ function InfiniteTileFloor() {
         }
     }
 
-    // ▼▼▼ 修正箇所: limit を明示的に設定 ▼▼▼
-    // これがないとデフォルトの1000個で描画が止まってしまう
     return (
         <group>
             <Instances range={tileData.length} limit={tileData.length}>
@@ -94,25 +85,41 @@ function MovableSlope() {
         <RigidBody type="kinematicPosition" position={slopePos} rotation={[0, 0, slopeRot]}>
             <mesh castShadow receiveShadow>
                 <cylinderGeometry args={[1, 1, 2, 3]} />
-                <meshStandardMaterial
-                    color="#fbbf24"
-                    roughness={0.8}
-                    flatShading={true}
-                />
+                <meshStandardMaterial color="#fbbf24" roughness={0.8} flatShading={true} />
             </mesh>
         </RigidBody>
     );
 }
 
+/**
+ * ▼▼▼ ゴール修正: センサーを追加 ▼▼▼
+ */
 function Goal() {
+    const setGameStatus = useStore((state) => state.setGameStatus);
+    const isPlaying = useStore((state) => state.isPlaying);
+
     return (
-        <mesh position={[4, -5.79, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-            <planeGeometry args={[1, 1]} />
-            <meshStandardMaterial color="#FFD000" transparent opacity={0.6} />
-            <mesh position={[0, 0, 0.1]}>
-                <ringGeometry args={[0.3, 0.4, 32]} />
-                <meshBasicMaterial color="white" />
+        // sensor propをつけると、物体は突き抜けるが「接触イベント」だけ発生するようになる
+        <RigidBody
+            type="fixed"
+            sensor
+            position={[4, -5.79, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            onIntersectionEnter={({ other }) => {
+                // プレイ中かつ、ぶつかった相手の名前が "player" ならクリア！
+                if (isPlaying && other.rigidBodyObject?.name === "player") {
+                    setGameStatus('cleared');
+                }
+            }}
+        >
+            <mesh receiveShadow>
+                <planeGeometry args={[1, 1]} />
+                <meshStandardMaterial color="#FFD000" transparent opacity={0.6} />
+                <mesh position={[0, 0, 0.1]}>
+                    <ringGeometry args={[0.3, 0.4, 32]} />
+                    <meshBasicMaterial color="white" />
+                </mesh>
             </mesh>
-        </mesh>
+        </RigidBody>
     );
 }

@@ -1,25 +1,20 @@
 import React, { Suspense, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import {
-    PerspectiveCamera,
-    OrbitControls,
-} from '@react-three/drei';
+import { PerspectiveCamera, OrbitControls } from '@react-three/drei';
 import { Physics } from '@react-three/rapier';
-import { RotateCw, Play, Square, RotateCcw, MousePointer2 } from 'lucide-react';
+import { RotateCw, Play, Square, RotateCcw, MousePointer2, Trophy } from 'lucide-react'; // Trophy追加
 import { Experience } from './components/Experience';
 import * as THREE from 'three';
-// ▼▼▼ 新しく作ったファイルからインポート ▼▼▼
 import { useStore } from './store/useStore';
-
-// 【削除】interface GameState ... 
-// 【削除】export const useStore = create<GameState> ... 
-// ↑ これらはもう store/useStore.ts に移動したので削除済みとして扱います
 
 /**
  * 2. UI COMPONENTS
  */
 function GameUI() {
-    const { isPlaying, togglePlay, reset, rotateCursor, placeSlope } = useStore();
+    const { isPlaying, togglePlay, reset, rotateCursor, placeSlope, gameStatus } = useStore();
+
+    // クリア時は操作パネルを隠す
+    if (gameStatus === 'cleared') return <ClearScreen />;
 
     const containerStyle: React.CSSProperties = {
         position: 'absolute',
@@ -76,24 +71,61 @@ function GameUI() {
 }
 
 /**
- * 3. RESPONSIVE CAMERA LOGIC
+ * ▼▼▼ クリア画面のコンポーネント (新規追加) ▼▼▼
  */
+function ClearScreen() {
+    const reset = useStore((state) => state.reset);
+
+    return (
+        <div style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.6)', // 半透明の黒背景
+            pointerEvents: 'auto',
+            zIndex: 10,
+        }}>
+            <Trophy size={80} color="#FFD000" style={{ marginBottom: '20px' }} />
+            <h1 style={{ color: '#fff', fontSize: '48px', fontWeight: 900, margin: 0, letterSpacing: '4px' }}>
+                CLEAR!!
+            </h1>
+            <p style={{ color: '#ccc', marginTop: '10px', marginBottom: '40px' }}>Great Job!</p>
+
+            <button
+                onClick={reset}
+                style={{
+                    padding: '16px 48px',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    backgroundColor: '#FFD000',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '50px',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 15px rgba(255, 208, 0, 0.4)'
+                }}
+            >
+                REPLAY
+            </button>
+        </div>
+    );
+}
+
+// ... (ResponsiveCamera は変更なし)
 function ResponsiveCamera() {
     const { camera, size } = useThree();
-
     useEffect(() => {
         const aspect = size.width / size.height;
         const fov = 60;
         const targetVisibleWidth = 14;
-
         const distance = (targetVisibleWidth / 2) / (Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect);
-
         camera.position.set(0, distance, distance);
         camera.lookAt(0, 0, 0);
         camera.updateProjectionMatrix();
-
     }, [size.width, size.height, camera]);
-
     return null;
 }
 
@@ -106,15 +138,8 @@ export default function App() {
     return (
         <div style={{ width: '100vw', height: '100vh', backgroundColor: '#dcdcdc', overflow: 'hidden', position: 'relative' }}>
             <Canvas shadows gl={{ antialias: false, pixelRatio: 1 }}>
-
-                <PerspectiveCamera
-                    makeDefault
-                    position={[0, 20, 20]}
-                    fov={60}
-                />
-
+                <PerspectiveCamera makeDefault position={[0, 20, 20]} fov={60} />
                 <ResponsiveCamera />
-
                 <OrbitControls
                     makeDefault
                     enabled={!isHoveringFloor}
@@ -126,7 +151,6 @@ export default function App() {
                     minPolarAngle={Math.PI / 6}
                     maxPolarAngle={Math.PI / 2.5}
                 />
-
                 <Suspense fallback={null}>
                     <Physics gravity={[0, -9.81, 0]}>
                         <Experience />

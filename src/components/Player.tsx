@@ -6,7 +6,6 @@ import * as THREE from 'three';
 export function Player() {
     const rbRef = useRef<RigidBodyApi>(null);
     const isPlaying = useStore((state) => state.isPlaying);
-    // Starting slightly higher for dramatic drop
     const startPos: [number, number, number] = [-8, 6, 0];
 
     useEffect(() => {
@@ -21,22 +20,23 @@ export function Player() {
     return (
         <RigidBody
             ref={rbRef}
+            // ▼▼▼ ここを追加：名札をつける ▼▼▼
+            name="player"
+            // ▲▲▲ ここまで ▲▲▲
             type={isPlaying ? "dynamic" : "kinematicPosition"}
             position={startPos}
             colliders={false}
-            // Keep it constrained to the 2D plane for gameplay consistency
             enabledTranslations={[true, true, false]}
             enabledRotations={[false, false, true]}
         >
             <CuboidCollider args={[0.5, 0.5, 0.5]} />
             <mesh castShadow receiveShadow>
                 <boxGeometry args={[1, 1, 1]} />
-                {/* flatShadingを追加して、面ごとの陰影を強調する */}
                 <meshStandardMaterial
-                    color="#e5484d" // Radix Red 9
+                    color="#e5484d"
                     roughness={0.8}
                     metalness={0.1}
-                    flatShading={true} // ← これが重要です
+                    flatShading={true}
                 />
             </mesh>
         </RigidBody>
