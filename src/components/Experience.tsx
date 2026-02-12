@@ -1,12 +1,13 @@
 import { Physics, RigidBody } from '@react-three/rapier';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Instances, Instance } from '@react-three/drei';
 import { Player } from './Player';
 import { useStore } from '../store/useStore';
 
 export function Experience() {
     return (
         <>
-            <color attach="background" args={['#202025']} />
+            {/* 背景色をタイルの暗い色に合わせて、遠くの境界を目立たなくする */}
+            <color attach="background" args={['#dcdcdc']} />
 
             <ambientLight intensity={0.7} />
             <directionalLight
@@ -19,12 +20,23 @@ export function Experience() {
             <Physics gravity={[0, -9.81, 0]}>
                 <Player />
                 <InvisibleFloor />
-                <TileFloor />
+
+                {/* 巨大なタイル床 (Instancesで軽量化) */}
+                <InfiniteTileFloor />
+
                 <MovableSlope />
                 <Goal />
             </Physics>
 
-            <OrbitControls makeDefault target={[0, 0, 0]} enableZoom={true} />
+            <OrbitControls
+                makeDefault
+                target={[0, 0, 0]}
+                enableZoom={true}
+                // ▼▼▼ パン（平行移動）を有効化 ▼▼▼
+                enablePan={true}
+                // パンの速度調整（お好みで）
+                panSpeed={1}
+            />
         </>
     );
 }
@@ -41,42 +53,39 @@ function InvisibleFloor() {
 }
 
 /**
- * 見た目用のタイルグリッド (サイズを拡大)
+ * インスタンス描画を使った巨大なタイル床
+ * 60x60 = 3600枚のタイルを軽量に描画します
  */
-function TileFloor() {
-    // ▼▼▼ 修正箇所 ▼▼▼
-    // サイズを 10 から 20 に変更して、画面の端まで床があるように見せる
-    const size = 20;
-    // ▲▲▲ 修正箇所 ▲▲▲
-
+function InfiniteTileFloor() {
+    const size = 60; // サイズを大幅に拡大
     const half = size / 2;
-    const tiles = [];
 
+    // タイルの配置データを計算
+    const tileData = [];
     for (let x = -half; x < half; x++) {
         for (let z = -half; z < half; z++) {
             const isWhite = (x + z) % 2 === 0;
             const color = isWhite ? '#f0f0f0' : '#dcdcdc';
-
-            tiles.push(
-                <mesh
-                    key={`${x}-${z}`}
-                    position={[x, -5.9, z]}
-                    receiveShadow
-                >
-                    <boxGeometry args={[0.95, 0.2, 0.95]} />
-                    <meshStandardMaterial
-                        color={color}
-                        roughness={0.8}
-                        flatShading={true}
-                    />
-                </mesh>
-            );
+            tileData.push({ position: [x, -5.9, z], color });
         }
     }
 
     return (
         <group>
-            {tiles}
+            {/* インスタンスの定義: ジオメトリとマテリアルを共有 */}
+            <Instances range={tileData.length}>
+                <boxGeometry args={[0.95, 0.2, 0.95]} />
+                <meshStandardMaterial roughness={0.8} flatShading />
+
+                {/* 個々のタイルを配置 */}
+                {tileData.map((data, i) => (
+                    <Instance
+                        key={i}
+                        position={data.position as [number, number, number]}
+                        color={data.color}
+                    />
+                ))}
+            </Instances>
         </group>
     );
 }
