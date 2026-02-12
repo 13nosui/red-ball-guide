@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect } from 'react';
-import { Canvas, useThree } from '@react-three/fiber'; // useThreeを追加
+import { Canvas, useThree } from '@react-three/fiber';
 import {
     PerspectiveCamera,
     OrbitControls,
@@ -8,6 +8,7 @@ import { Physics } from '@react-three/rapier';
 import { create } from 'zustand';
 import { RotateCw, Play, Square, RotateCcw, MousePointer2 } from 'lucide-react';
 import { Experience } from './components/Experience';
+import * as THREE from 'three';
 
 /**
  * 1. GAME STATE (変更なし)
@@ -106,37 +107,34 @@ function GameUI() {
 }
 
 /**
- * 3. RESPONSIVE CAMERA HELPER (新規追加)
- * 画面サイズに応じてカメラ位置を調整するコンポーネント
+ * 3. RESPONSIVE CAMERA LOGIC (修正版)
+ * 画面の比率にかかわらず、常に一定の「横幅」が映るようにカメラ距離を自動計算する
  */
-function AdjustCamera() {
+function ResponsiveCamera() {
     const { camera, size } = useThree();
 
     useEffect(() => {
         const aspect = size.width / size.height;
+        const fov = 60;
 
-        // 基本の距離 (PC/横画面用)
-        const baseDistance = 12;
+        // 画面内に収めたいステージの横幅（単位:メートル）
+        // これを増やすと、より広範囲が映る（カメラが遠ざかる）
+        const targetVisibleWidth = 26;
 
-        // スマホ(縦画面 aspect < 1)の場合は、
-        // 画面が狭いぶんだけカメラを後ろに下げる係数を計算
-        // aspect 0.5 (縦長) なら factor 2.0 (2倍後ろへ)
-        const factor = aspect < 1 ? 1.8 / aspect : 1;
+        // 視野角(FOV)とアスペクト比から、必要なカメラ距離を逆算する公式
+        // distance = (width / 2) / (tan(fov/2) * aspect)
+        const distance = (targetVisibleWidth / 2) / (Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect);
 
-        // 補正した位置を適用
-        // PCなら [0, 12, 12]
-        // スマホなら [0, 24, 24] くらいになる
-        const adjustedY = baseDistance * (aspect < 1 ? Math.max(1.5, factor * 0.6) : 1);
-        const adjustedZ = baseDistance * (aspect < 1 ? Math.max(1.5, factor * 0.6) : 1);
-
-        camera.position.set(0, adjustedY, adjustedZ);
+        // カメラ位置を更新（高さYと奥行きZを同じにして45度見下ろしを維持）
+        // 見下ろし角度を変えずに距離だけ調整
+        camera.position.set(0, distance, distance);
         camera.lookAt(0, 0, 0);
+        camera.updateProjectionMatrix();
 
     }, [size.width, size.height, camera]);
 
     return null;
 }
-
 
 /**
  * 4. MAIN EXPORT
@@ -148,15 +146,15 @@ export default function App() {
         <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000', overflow: 'hidden', position: 'relative' }}>
             <Canvas shadows gl={{ antialias: false, pixelRatio: 1 }}>
 
-                {/* カメラは AdjustCamera で制御されるので初期値だけでOK */}
+                {/* カメラの初期設定 (ResponsiveCameraで上書きされるが、初期値として遠くに置いておく) */}
                 <PerspectiveCamera
                     makeDefault
-                    position={[0, 12, 12]}
+                    position={[0, 20, 20]}
                     fov={60}
                 />
 
-                {/* レスポンシブ調整コンポーネントをCanvas内に配置 */}
-                <AdjustCamera />
+                {/* レスポンシブ制御 */}
+                <ResponsiveCamera />
 
                 <OrbitControls
                     makeDefault
