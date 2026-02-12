@@ -4,7 +4,7 @@ import {
     PerspectiveCamera,
     OrbitControls,
     Grid,
-    Edges,
+    // Edgesは不要なので削除
     Html
 } from '@react-three/drei';
 import { Physics, RigidBody, RigidBodyApi, CuboidCollider } from '@react-three/rapier';
@@ -77,7 +77,8 @@ function Player() {
             <CuboidCollider args={[0.5, 0.5, 0.5]} />
             <mesh castShadow receiveShadow>
                 <boxGeometry args={[1, 1, 1]} />
-                <meshStandardMaterial color="#e5484d" roughness={0.8} />
+                {/* flatShadingを追加して面を際立たせる */}
+                <meshStandardMaterial color="#e5484d" roughness={0.8} flatShading />
             </mesh>
         </RigidBody>
     );
@@ -96,8 +97,8 @@ function Experience() {
     return (
         <>
             <color attach="background" args={['#000000']} />
-            <ambientLight intensity={0.5} />
-            <directionalLight castShadow position={[5, 10, 5]} intensity={1.2} />
+            <ambientLight intensity={0.6} />
+            <directionalLight castShadow position={[5, 10, 5]} intensity={1.5} shadow-mapSize={[1024, 1024]} />
 
             {/* Collision Detection Floor */}
             <mesh
@@ -114,8 +115,8 @@ function Experience() {
             <Grid
                 args={[20, 20]}
                 cellColor="#333"
-                sectionColor="#444"
-                fadeDistance={20}
+                sectionColor="#555"
+                fadeDistance={25}
                 position={[0, -5.99, 0]}
             />
 
@@ -131,23 +132,25 @@ function Experience() {
                 <group position={cursorPos}>
                     <mesh>
                         <boxGeometry args={[1, 0.1, 1]} />
-                        <meshStandardMaterial color="white" transparent opacity={0.4} />
-                        <Edges color="white" />
+                        {/* Edgesを削除し、半透明の面のみにする */}
+                        <meshStandardMaterial color="white" transparent opacity={0.3} flatShading />
                     </mesh>
                     {/* Ghost Slope Preview */}
                     <mesh position={[0, 1, 0]} rotation={[0, 0, useStore.getState().cursorRot]}>
                         <cylinderGeometry args={[1, 1, 2, 3]} />
-                        <meshStandardMaterial color="white" transparent opacity={0.2} />
+                        {/* プレビューも面で見せる */}
+                        <meshStandardMaterial color="#fbbf24" transparent opacity={0.3} flatShading />
                     </mesh>
                 </group>
             )}
 
-            {/* Real Slope */}
+            {/* Real Slope (ここに鮮やかな色を適用) */}
             <RigidBody type="kinematicPosition" position={slopePos} rotation={[0, 0, slopeRot]}>
                 <mesh castShadow receiveShadow>
                     <cylinderGeometry args={[1, 1, 2, 3]} />
-                    <meshStandardMaterial color="#222" />
-                    <Edges color="white" />
+                    {/* 暗い色をやめ、質感.pngのような鮮やかな黄色に変更し、flatShadingをON */}
+                    <meshStandardMaterial color="#fbbf24" roughness={0.8} flatShading />
+                    {/* <Edges /> は削除 */}
                 </mesh>
             </RigidBody>
 
@@ -229,6 +232,7 @@ export default function App() {
 
     return (
         <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000', overflow: 'hidden', position: 'relative' }}>
+            {/* antialias: false, pixelRatio: 1 はそのまま維持しレトロ感を保つ */}
             <Canvas shadows gl={{ antialias: false, pixelRatio: 1 }}>
                 <PerspectiveCamera
                     makeDefault

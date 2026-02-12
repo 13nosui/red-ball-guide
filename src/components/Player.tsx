@@ -31,10 +31,12 @@ export function Player() {
             <CuboidCollider args={[0.5, 0.5, 0.5]} />
             <mesh castShadow receiveShadow>
                 <boxGeometry args={[1, 1, 1]} />
+                {/* flatShadingを追加して、面ごとの陰影を強調する */}
                 <meshStandardMaterial
                     color="#e5484d" // Radix Red 9
                     roughness={0.8}
                     metalness={0.1}
+                    flatShading={true} // ← これが重要です
                 />
             </mesh>
         </RigidBody>
