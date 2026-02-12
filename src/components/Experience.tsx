@@ -6,7 +6,7 @@ import { useStore } from '../store/useStore';
 export function Experience() {
     return (
         <>
-            {/* 背景色をタイルの暗い色に合わせて、遠くの境界を目立たなくする */}
+            {/* 背景色: タイルの色と合わせて境界をなじませる */}
             <color attach="background" args={['#dcdcdc']} />
 
             <ambientLight intensity={0.7} />
@@ -21,7 +21,7 @@ export function Experience() {
                 <Player />
                 <InvisibleFloor />
 
-                {/* 巨大なタイル床 (Instancesで軽量化) */}
+                {/* 修正版: limitを設定した巨大タイル床 */}
                 <InfiniteTileFloor />
 
                 <MovableSlope />
@@ -32,9 +32,7 @@ export function Experience() {
                 makeDefault
                 target={[0, 0, 0]}
                 enableZoom={true}
-                // ▼▼▼ パン（平行移動）を有効化 ▼▼▼
                 enablePan={true}
-                // パンの速度調整（お好みで）
                 panSpeed={1}
             />
         </>
@@ -54,13 +52,11 @@ function InvisibleFloor() {
 
 /**
  * インスタンス描画を使った巨大なタイル床
- * 60x60 = 3600枚のタイルを軽量に描画します
  */
 function InfiniteTileFloor() {
-    const size = 60; // サイズを大幅に拡大
+    const size = 60; // 60x60 = 3600枚
     const half = size / 2;
 
-    // タイルの配置データを計算
     const tileData = [];
     for (let x = -half; x < half; x++) {
         for (let z = -half; z < half; z++) {
@@ -70,14 +66,14 @@ function InfiniteTileFloor() {
         }
     }
 
+    // ▼▼▼ 修正箇所: limit を明示的に設定 ▼▼▼
+    // これがないとデフォルトの1000個で描画が止まってしまう
     return (
         <group>
-            {/* インスタンスの定義: ジオメトリとマテリアルを共有 */}
-            <Instances range={tileData.length}>
+            <Instances range={tileData.length} limit={tileData.length}>
                 <boxGeometry args={[0.95, 0.2, 0.95]} />
                 <meshStandardMaterial roughness={0.8} flatShading />
 
-                {/* 個々のタイルを配置 */}
                 {tileData.map((data, i) => (
                     <Instance
                         key={i}
