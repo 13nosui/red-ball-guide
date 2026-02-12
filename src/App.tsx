@@ -1,5 +1,5 @@
-import React, { Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
+import React, { Suspense, useEffect } from 'react';
+import { Canvas, useThree } from '@react-three/fiber'; // useThreeを追加
 import {
     PerspectiveCamera,
     OrbitControls,
@@ -7,7 +7,7 @@ import {
 import { Physics } from '@react-three/rapier';
 import { create } from 'zustand';
 import { RotateCw, Play, Square, RotateCcw, MousePointer2 } from 'lucide-react';
-import { Experience } from './components/Experience'; // Experienceコンポーネントのパスに合わせてください
+import { Experience } from './components/Experience';
 
 /**
  * 1. GAME STATE (変更なし)
@@ -106,7 +106,40 @@ function GameUI() {
 }
 
 /**
- * 3. MAIN EXPORT (カメラ位置を修正)
+ * 3. RESPONSIVE CAMERA HELPER (新規追加)
+ * 画面サイズに応じてカメラ位置を調整するコンポーネント
+ */
+function AdjustCamera() {
+    const { camera, size } = useThree();
+
+    useEffect(() => {
+        const aspect = size.width / size.height;
+
+        // 基本の距離 (PC/横画面用)
+        const baseDistance = 12;
+
+        // スマホ(縦画面 aspect < 1)の場合は、
+        // 画面が狭いぶんだけカメラを後ろに下げる係数を計算
+        // aspect 0.5 (縦長) なら factor 2.0 (2倍後ろへ)
+        const factor = aspect < 1 ? 1.8 / aspect : 1;
+
+        // 補正した位置を適用
+        // PCなら [0, 12, 12]
+        // スマホなら [0, 24, 24] くらいになる
+        const adjustedY = baseDistance * (aspect < 1 ? Math.max(1.5, factor * 0.6) : 1);
+        const adjustedZ = baseDistance * (aspect < 1 ? Math.max(1.5, factor * 0.6) : 1);
+
+        camera.position.set(0, adjustedY, adjustedZ);
+        camera.lookAt(0, 0, 0);
+
+    }, [size.width, size.height, camera]);
+
+    return null;
+}
+
+
+/**
+ * 4. MAIN EXPORT
  */
 export default function App() {
     const isHoveringFloor = useStore((state) => state.isHoveringFloor);
@@ -115,26 +148,26 @@ export default function App() {
         <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000', overflow: 'hidden', position: 'relative' }}>
             <Canvas shadows gl={{ antialias: false, pixelRatio: 1 }}>
 
-                {/* ▼▼▼ カメラ設定の変更箇所 ▼▼▼ */}
+                {/* カメラは AdjustCamera で制御されるので初期値だけでOK */}
                 <PerspectiveCamera
                     makeDefault
-                    // x=0(正面), y=12(高さ), z=12(手前) に設定
                     position={[0, 12, 12]}
-                    // 視野角を広げてパース（遠近感）を強める
                     fov={60}
                 />
+
+                {/* レスポンシブ調整コンポーネントをCanvas内に配置 */}
+                <AdjustCamera />
+
                 <OrbitControls
                     makeDefault
                     enabled={!isHoveringFloor}
                     enableZoom={true}
                     enablePan={false}
-                    // カメラの回転を制限して「正面」から大きく外れないようにする（お好みで調整可）
                     minAzimuthAngle={-Math.PI / 4}
                     maxAzimuthAngle={Math.PI / 4}
                     minPolarAngle={Math.PI / 6}
                     maxPolarAngle={Math.PI / 2.5}
                 />
-                {/* ▲▲▲ 変更ここまで ▲▲▲ */}
 
                 <Suspense fallback={null}>
                     <Physics gravity={[0, -9.81, 0]}>
