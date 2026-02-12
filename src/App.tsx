@@ -1,52 +1,35 @@
 import React, { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Physics } from '@react-three/rapier';
-import { PerspectiveCamera, Environment } from '@react-three/drei';
-import * as THREE from 'three';
-import { Player } from './components/Player';
-import { Level, MovableSlope } from './components/Level';
+import { PerspectiveCamera } from '@react-three/drei';
+import { Experience } from './components/Experience';
 import { UI } from './components/UI';
 
 export default function App() {
     return (
-        <div className="w-full h-full bg-black flex flex-col overflow-hidden">
+        <div className="w-full h-full bg-black flex flex-col overflow-hidden font-sans">
             <div className="flex-grow relative">
                 <Canvas
-                    shadows={{ type: THREE.BasicShadowMap }}
+                    shadows
                     gl={{ antialias: false }}
-                    onCreated={({ gl }) => {
-                        gl.setClearColor('#000000');
-                    }}
+                    dpr={[1, 2]}
                 >
                     <PerspectiveCamera
                         makeDefault
-                        fov={85}
-                        position={[10, 10, 15]}
-                    />
-
-                    <ambientLight intensity={0.5} />
-                    <directionalLight
-                        castShadow
-                        position={[10, 20, 10]}
-                        intensity={1.5}
-                        shadow-mapSize={[512, 512]}
-                        shadow-camera-left={-20}
-                        shadow-camera-right={20}
-                        shadow-camera-top={20}
-                        shadow-camera-bottom={-20}
+                        fov={55}
+                        position={[8, 10, 10]}
                     />
 
                     <Suspense fallback={null}>
-                        <Physics gravity={[0, -9.81, 0]}>
-                            <Player />
-                            <MovableSlope />
-                            <Level />
-                        </Physics>
+                        <Experience />
                     </Suspense>
                 </Canvas>
 
-                <div className="absolute top-4 w-full text-center pointer-events-none">
-                    <h1 className="text-slate-1 font-bold tracking-widest text-xl opacity-80">RED BALL GUIDE</h1>
+                {/* Minimal HUD overlay */}
+                <div className="absolute top-6 left-6 pointer-events-none select-none">
+                    <h1 className="text-slate-1 font-black italic tracking-tighter text-2xl opacity-60">
+                        RB.GUIDE_v4
+                    </h1>
+                    <div className="h-1 w-12 bg-red-9 mt-1" />
                 </div>
             </div>
 

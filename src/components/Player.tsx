@@ -1,12 +1,12 @@
 import { useRef, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { RigidBody, RigidBodyApi } from '@react-three/rapier';
+import { RigidBody, RigidBodyApi, CuboidCollider } from '@react-three/rapier';
 import { useStore } from '../store/useStore';
 import * as THREE from 'three';
 
 export function Player() {
     const rbRef = useRef<RigidBodyApi>(null);
     const isPlaying = useStore((state) => state.isPlaying);
+    // Starting slightly higher for dramatic drop
     const startPos: [number, number, number] = [-8, 6, 0];
 
     useEffect(() => {
@@ -23,12 +23,19 @@ export function Player() {
             ref={rbRef}
             type={isPlaying ? "dynamic" : "kinematicPosition"}
             position={startPos}
-            colliders="ball"
-            restitution={0.5}
+            colliders={false}
+            // Keep it constrained to the 2D plane for gameplay consistency
+            enabledTranslations={[true, true, false]}
+            enabledRotations={[false, false, true]}
         >
-            <mesh castShadow>
-                <sphereGeometry args={[0.5, 32, 32]} />
-                <meshStandardMaterial color="#E5484D" roughness={0.8} metalness={0.2} />
+            <CuboidCollider args={[0.5, 0.5, 0.5]} />
+            <mesh castShadow receiveShadow>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial
+                    color="#e5484d" // Radix Red 9
+                    roughness={0.8}
+                    metalness={0.1}
+                />
             </mesh>
         </RigidBody>
     );
