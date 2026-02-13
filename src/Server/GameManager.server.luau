@@ -7,7 +7,6 @@ local Palette = require(Shared:WaitForChild("Palette"))
 local GameControlEvent = require(Events.GameControlEvent)
 
 -- 設定
--- ゴールの厚みを6にするため、中心高さを3に設定（地面Y=0の上に置く）
 local GOAL_POSITION = Vector3.new(0, 3, -20)
 local START_POSITION = Vector3.new(0, 15, 0)
 local BALL_SIZE = 4
@@ -30,7 +29,6 @@ local function spawnGoal()
 	-- 1. 土台（ベース）
 	local basePart = Instance.new("Part")
 	basePart.Name = "Base"
-	-- 厚みを2→6に変更して深くする
 	basePart.Size = Vector3.new(12, 6, 12)
 	basePart.CFrame = CFrame.new(GOAL_POSITION)
 	basePart.Color = Palette.Entity.GoalBase
@@ -42,7 +40,6 @@ local function spawnGoal()
 	holeCutter.Name = "Cutter"
 	holeCutter.Shape = Enum.PartType.Cylinder
 	holeCutter.CFrame = basePart.CFrame * CFrame.Angles(0, 0, math.rad(90))
-	-- 貫通させるため長さを十分にとる(8)
 	holeCutter.Size = Vector3.new(8, HOLE_SIZE, HOLE_SIZE)
 
 	-- 3. CSG実行
@@ -55,17 +52,29 @@ local function spawnGoal()
 		unionGoal.Anchored = true
 		unionGoal.Parent = model
 
-		-- 元パーツ破棄
 		basePart:Destroy()
 		holeCutter:Destroy()
 
-		-- 4. 判定センサー（穴の底付近）
+		-- ★追加: 視覚的なカップの底
+		local cupBottom = Instance.new("Part")
+		cupBottom.Name = "CupBottom"
+		cupBottom.Shape = Enum.PartType.Cylinder
+		cupBottom.Size = Vector3.new(0.2, HOLE_SIZE * 0.95, HOLE_SIZE * 0.95) -- 薄い円柱
+		cupBottom.Color = Palette.Entity.GoalCup -- 暗い色
+		cupBottom.Material = Enum.Material.Plastic
+		cupBottom.Anchored = true
+		cupBottom.CanCollide = true -- ボールが乗るように
+		-- ゴールの中央下部に配置 (高さ3の半分である-1.5の位置)
+		cupBottom.CFrame = unionGoal.CFrame * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(-1.5, 0, 0)
+		cupBottom.Parent = model
+
+		-- 4. 判定センサー（カップ底の少し上）
 		local sensor = Instance.new("Part")
 		sensor.Name = "WinSensor"
-		sensor.Size = Vector3.new(HOLE_SIZE * 0.8, 0.5, HOLE_SIZE * 0.8)
+		sensor.Size = Vector3.new(0.5, HOLE_SIZE * 0.8, HOLE_SIZE * 0.8)
 		sensor.Shape = Enum.PartType.Cylinder
-		-- ゴール底面近くに配置
-		sensor.CFrame = unionGoal.CFrame * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(-2, 0, 0)
+		-- カップ底の少し上に配置
+		sensor.CFrame = cupBottom.CFrame * CFrame.new(0.5, 0, 0)
 		sensor.Transparency = 1
 		sensor.CanCollide = false
 		sensor.Anchored = true
@@ -122,7 +131,6 @@ local function spawnBall()
 	ball.Position = START_POSITION
 	ball.Anchored = true
 	ball.CanCollide = true
-	-- 転がりやすく弾みすぎない設定
 	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.1)
 	ball.Parent = workspace
 
@@ -163,4 +171,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Goal Height Adjusted")
+print("GameManager Updated: Goal Cup Visual Added")

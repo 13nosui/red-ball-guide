@@ -16,6 +16,7 @@ Palette.Entity = {
 	GoalBase = Color3.fromHex("#15803d"), -- Green 700 (芝生)
 	GoalFlag = Color3.fromHex("#eab308"), -- Yellow 500 (旗)
 	GoalPole = Color3.fromHex("#f8fafc"), -- Slate 50 (ポール)
+	GoalCup = Color3.fromHex("#334155"), -- Slate 700 (カップの底) ★追加
 }
 
 -- システムカラー
