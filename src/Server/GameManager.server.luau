@@ -7,7 +7,7 @@ local Palette = require(Shared:WaitForChild("Palette"))
 local GameControlEvent = require(Events.GameControlEvent)
 
 -- 設定
-local GOAL_POSITION = Vector3.new(0, -2, -20)
+local GOAL_POSITION = Vector3.new(0, -2, -20) -- Y=-2 (厚さ4なので表面はY=0)
 local START_POSITION = Vector3.new(0, 15, 0)
 local BALL_SIZE = 4
 local HOLE_SIZE = 5.5
@@ -18,49 +18,112 @@ local GOAL_WIDTH = 12
 local currentBall = nil
 local isGoalLocked = false
 
--- ■ Baseplateの加工処理
-local function cutBaseplateForGoal(targetCFrame, size)
+-- ■ 地面生成関数（4分割法）
+-- Baseplateをくり抜くのではなく、ゴールの周囲に4つのパーツを配置して「隙間」を作る
+local function createFloorWithGap(gapPosition, gapSize)
 	local baseplate = workspace:FindFirstChild("Baseplate")
-	if not baseplate then
-		return
-	end
-
-	if baseplate:IsA("UnionOperation") and baseplate.Name == "BaseplateWithHole" then
-		return
-	end
-
-	print("Cutting Baseplate to fit goal...")
-
-	local cutter = Instance.new("Part")
-	cutter.Name = "BaseplateCutter"
-	cutter.Size = Vector3.new(size.X, 20, size.Z)
-	cutter.CFrame = targetCFrame
-	cutter.Anchored = true
-	cutter.Parent = workspace
-
-	local success, result = pcall(function()
-		-- ★修正1: Baseplateの穴も精密に計算する
-		return baseplate:SubtractAsync({ cutter }, Enum.CollisionFidelity.PreciseConvexDecomposition)
-	end)
-
-	if success and result then
-		result.Name = "BaseplateWithHole"
-		result.Anchored = true
-		result.CanCollide = true
-		result.Parent = workspace
-
-		for _, child in pairs(baseplate:GetChildren()) do
-			if child:IsA("Texture") then
-				child.Parent = result
-			end
-		end
-
+	if baseplate then
 		baseplate:Destroy()
-	else
-		warn("Failed to cut Baseplate:", result)
 	end
 
-	cutter:Destroy()
+	-- 既存の分割地面があれば削除
+	local oldFloor = workspace:FindFirstChild("GeneratedFloor")
+	if oldFloor then
+		oldFloor:Destroy()
+	end
+
+	local floorModel = Instance.new("Model")
+	floorModel.Name = "GeneratedFloor"
+
+	local WORLD_SIZE = 2048
+	local FLOOR_THICKNESS = 4
+	local Y_POS = -2 -- 表面が0になるように
+
+	-- グリッドテクスチャの設定関数
+	local function addGridTexture(part)
+		local texture = Instance.new("Texture")
+		texture.Name = "GridTexture"
+		texture.Face = Enum.NormalId.Top
+		texture.Texture = "rbxassetid://6372755229"
+		texture.Color3 = Color3.fromRGB(255, 255, 255)
+		texture.Transparency = 0.8
+		texture.StudsPerTileU = 4
+		texture.StudsPerTileV = 4
+		texture.Parent = part
+	end
+
+	-- 隙間（ゴール）の中心座標
+	local gx, gz = gapPosition.X, gapPosition.Z
+	local gw, gd = gapSize.X, gapSize.Z
+
+	-- 4つのエリアを計算して配置
+	-- 1. 北側 (奥: -Z方向)
+	local northSizeZ = (WORLD_SIZE / 2) - (math.abs(gz) + gd / 2)
+	local northPosZ = (gz - gd / 2) - northSizeZ / 2
+	if northSizeZ > 0 then
+		local p = Instance.new("Part")
+		p.Name = "FloorNorth"
+		p.Size = Vector3.new(WORLD_SIZE, FLOOR_THICKNESS, northSizeZ)
+		p.Position = Vector3.new(0, Y_POS, northPosZ)
+		p.Anchored = true
+		p.Color = Color3.fromRGB(15, 15, 20)
+		p.Material = Enum.Material.SmoothPlastic
+		addGridTexture(p)
+		p.Parent = floorModel
+	end
+
+	-- 2. 南側 (手前: +Z方向)
+	local southSizeZ = (WORLD_SIZE / 2) - (math.abs(gz) + gd / 2) -- 簡易計算（中心が0付近前提）
+	-- 正確には (1024 - (gz + gd/2))
+	local southStart = gz + gd / 2
+	local southEnd = WORLD_SIZE / 2
+	local sSizeZ = southEnd - southStart
+	local sPosZ = southStart + sSizeZ / 2
+
+	local pSouth = Instance.new("Part")
+	pSouth.Name = "FloorSouth"
+	pSouth.Size = Vector3.new(WORLD_SIZE, FLOOR_THICKNESS, sSizeZ)
+	pSouth.Position = Vector3.new(0, Y_POS, sPosZ)
+	pSouth.Anchored = true
+	pSouth.Color = Color3.fromRGB(15, 15, 20)
+	pSouth.Material = Enum.Material.SmoothPlastic
+	addGridTexture(pSouth)
+	pSouth.Parent = floorModel
+
+	-- 3. 西側 (左: -X方向)
+	-- Zの範囲はゴールのZ幅分だけ埋める
+	local westStart = -WORLD_SIZE / 2
+	local westEnd = gx - gw / 2
+	local wSizeX = westEnd - westStart
+	local wPosX = westStart + wSizeX / 2
+
+	local pWest = Instance.new("Part")
+	pWest.Name = "FloorWest"
+	pWest.Size = Vector3.new(wSizeX, FLOOR_THICKNESS, gd)
+	pWest.Position = Vector3.new(wPosX, Y_POS, gz)
+	pWest.Anchored = true
+	pWest.Color = Color3.fromRGB(15, 15, 20)
+	pWest.Material = Enum.Material.SmoothPlastic
+	addGridTexture(pWest)
+	pWest.Parent = floorModel
+
+	-- 4. 東側 (右: +X方向)
+	local eastStart = gx + gw / 2
+	local eastEnd = WORLD_SIZE / 2
+	local eSizeX = eastEnd - eastStart
+	local ePosX = eastStart + eSizeX / 2
+
+	local pEast = Instance.new("Part")
+	pEast.Name = "FloorEast"
+	pEast.Size = Vector3.new(eSizeX, FLOOR_THICKNESS, gd)
+	pEast.Position = Vector3.new(ePosX, Y_POS, gz)
+	pEast.Anchored = true
+	pEast.Color = Color3.fromRGB(15, 15, 20)
+	pEast.Material = Enum.Material.SmoothPlastic
+	addGridTexture(pEast)
+	pEast.Parent = floorModel
+
+	floorModel.Parent = workspace
 end
 
 -- ■ ゴール生成関数
@@ -74,10 +137,10 @@ local function spawnGoal()
 	model.Name = "GoalModel"
 	model.Parent = workspace
 
-	-- 0. Baseplateに穴を空ける
-	cutBaseplateForGoal(CFrame.new(GOAL_POSITION), Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
+	-- 0. 地面を再生成して、ゴールの場所に物理的な穴（隙間）を作る
+	createFloorWithGap(GOAL_POSITION, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
 
-	-- 1. ゴールの土台
+	-- 1. ゴールの土台（芝生）
 	local basePart = Instance.new("Part")
 	basePart.Name = "Base"
 	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH)
@@ -85,7 +148,7 @@ local function spawnGoal()
 	basePart.Color = Palette.Entity.GoalBase
 	basePart.Material = Enum.Material.Grass
 	basePart.Anchored = true
-	basePart.Parent = workspace
+	basePart.Parent = workspace -- 計算用にWorkspaceへ
 
 	-- 2. 穴あけ用パーツ
 	local holeCutter = Instance.new("Part")
@@ -95,9 +158,8 @@ local function spawnGoal()
 	holeCutter.Size = Vector3.new(GOAL_THICKNESS * 2, HOLE_SIZE, HOLE_SIZE)
 	holeCutter.Parent = workspace
 
-	-- 3. CSG実行
+	-- 3. CSG実行（小さなパーツ同士なら成功しやすい）
 	local success, result = pcall(function()
-		-- ★修正2: ゴールの穴を精密に計算する (ここが重要)
 		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.PreciseConvexDecomposition)
 	end)
 
@@ -212,6 +274,7 @@ local function resetGame()
 	print("Game Reset")
 end
 
+-- Baseplateを削除して床を作り直すため、EnvironmentSetupの直後に走るようにする
 task.wait(1)
 spawnGoal()
 spawnBall()
@@ -224,4 +287,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Precise Collision for Goal Hole")
+print("GameManager Updated: Replaced Baseplate with Gap-Floor System")
