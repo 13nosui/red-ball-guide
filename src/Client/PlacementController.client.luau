@@ -5,7 +5,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 
 -- イベントの取得
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -21,10 +20,16 @@ if not screenGui then
 end
 
 local editFrame = screenGui:WaitForChild("EditFrame")
+-- ドロワーのボタン（editFrame直下にある前提）
 local buttonBlock = editFrame:WaitForChild("ButtonBlock")
 local buttonSphere = editFrame:WaitForChild("ButtonSphere")
 local buttonWedge = editFrame:WaitForChild("ButtonWedge")
-local buttonRotate = editFrame:WaitForChild("ButtonRotate")
+
+-- 回転ボタン（ControlPanelの下にある）
+local controlPanel = editFrame:WaitForChild("ControlPanel")
+local buttonRotateX = controlPanel:WaitForChild("ButtonRotateX")
+local buttonRotateY = controlPanel:WaitForChild("ButtonRotateY")
+local buttonRotateZ = controlPanel:WaitForChild("ButtonRotateZ")
 
 -- 設定
 local GRID_SIZE = 4
@@ -40,7 +45,6 @@ selectionBox.Color3 = Color3.fromRGB(255, 170, 0)
 selectionBox.LineThickness = 0.05
 selectionBox.Parent = playerGui
 
--- レイキャストパラメータ
 local raycastParams = RaycastParams.new()
 raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 raycastParams.FilterDescendantsInstances = { player.Character }
@@ -78,7 +82,6 @@ local function createGhost(blockType)
 		part.Anchored = true
 		part.Parent = workspace
 
-		-- 自分をレイキャスト無視リストに追加
 		local currentFilter = raycastParams.FilterDescendantsInstances
 		table.insert(currentFilter, part)
 		raycastParams.FilterDescendantsInstances = currentFilter
@@ -87,7 +90,6 @@ local function createGhost(blockType)
 	return part
 end
 
--- ■ ヘルパー関数: スナップ計算
 local function getSnappedPosition(position)
 	local snappedX = math.floor(position.X / GRID_SIZE + 0.5) * GRID_SIZE
 	local snappedZ = math.floor(position.Z / GRID_SIZE + 0.5) * GRID_SIZE
@@ -95,18 +97,13 @@ local function getSnappedPosition(position)
 	return Vector3.new(snappedX, snappedY, snappedZ)
 end
 
--- ■ ドラッグ開始処理
+-- ■ ドラッグ処理
 local function setupDragButton(button, blockType)
 	button.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			isDragging = true
 			draggingBlockType = blockType
-
-			-- ゴーストを作成するが、最初は見えない場所に置くか非表示にするのも手
-			-- ここでは作成だけ行い、RenderSteppedで位置を更新する
 			ghostPart = createGhost(blockType)
-
-			-- ドラッグ開始時は選択解除
 			selectedBlock = nil
 			selectionBox.Adornee = nil
 		end
@@ -117,41 +114,31 @@ setupDragButton(buttonBlock, "Block")
 setupDragButton(buttonSphere, "Sphere")
 setupDragButton(buttonWedge, "Wedge")
 
--- ■ ドラッグ中の処理
 RunService.RenderStepped:Connect(function()
 	if isDragging and ghostPart then
 		local mouseLocation = UserInputService:GetMouseLocation()
 		local ray = workspace.CurrentCamera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
-
 		local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
 
 		if result then
-			local snapPos = getSnappedPosition(result.Position)
-			ghostPart.Position = snapPos
-			ghostPart.Transparency = 0.5 -- 配置可能な場所なら表示
+			ghostPart.Position = getSnappedPosition(result.Position)
+			ghostPart.Transparency = 0.5
 		else
-			-- 空中などを指している場合は見えなくする（または赤くする）
 			ghostPart.Transparency = 1
 		end
 	end
 end)
 
--- ■ ドラッグ終了処理（修正箇所）
 UserInputService.InputEnded:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		if isDragging then
-			-- gameProcessedがtrueの場合 = UIの上でマウスを離した = 配置キャンセル
 			if not gameProcessed and ghostPart and ghostPart.Transparency < 1 then
-				-- UI外かつ有効な場所にゴーストがある場合のみ配置
 				PlaceBlockEvent:FireServer(draggingBlockType, ghostPart.Position, Vector3.new(0, 0, 0))
 			end
-
-			-- クリーンアップ
 			if ghostPart then
 				ghostPart:Destroy()
 				ghostPart = nil
 			end
-			-- フィルタリストリセット
 			raycastParams.FilterDescendantsInstances = { player.Character }
 			isDragging = false
 		end
@@ -163,26 +150,37 @@ UpdateBlockEvent.OnClientEvent:Connect(function(block)
 	if block then
 		selectedBlock = block
 		selectionBox.Adornee = block
-		print("Selected:", block.Name)
 	end
 end)
 
--- ■ 回転処理
-local function rotateSelectedBlock()
+-- ■ 回転処理（3軸対応）
+local function rotateSelectedBlock(degreesVector)
 	if selectedBlock and selectedBlock.Parent then
-		UpdateBlockEvent:FireServer(selectedBlock, "rotate", Vector3.new(0, 90, 0))
+		UpdateBlockEvent:FireServer(selectedBlock, "rotate", degreesVector)
 	end
 end
 
-buttonRotate.MouseButton1Click:Connect(rotateSelectedBlock)
+-- 各ボタンに軸ごとの回転を割り当て
+buttonRotateX.MouseButton1Click:Connect(function()
+	rotateSelectedBlock(Vector3.new(90, 0, 0))
+end)
 
+buttonRotateY.MouseButton1Click:Connect(function()
+	rotateSelectedBlock(Vector3.new(0, 90, 0))
+end)
+
+buttonRotateZ.MouseButton1Click:Connect(function()
+	rotateSelectedBlock(Vector3.new(0, 0, 90))
+end)
+
+-- RキーはY軸回転（デフォルト）
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.R then
-		rotateSelectedBlock()
+		rotateSelectedBlock(Vector3.new(0, 90, 0))
 	end
 end)
 
-print("Drag & Drop Controller Fixed")
+print("Placement Controller with 3-Axis Rotation Loaded")
