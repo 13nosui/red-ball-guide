@@ -13,10 +13,15 @@ Palette.BlockColors = {
 -- キャラクター・エンティティ
 Palette.Entity = {
 	Ball = Color3.fromHex("#DC2626"), -- Red 600
-	GoalBase = Color3.fromHex("#15803d"), -- Green 700 (芝生)
-	GoalFlag = Color3.fromHex("#eab308"), -- Yellow 500 (旗)
-	GoalPole = Color3.fromHex("#f8fafc"), -- Slate 50 (ポール)
-	GoalCup = Color3.fromHex("#334155"), -- Slate 700 (カップの底) ★追加
+	GoalBase = Color3.fromHex("#15803d"), -- Green 700
+	GoalFlag = Color3.fromHex("#eab308"), -- Yellow 500
+	GoalPole = Color3.fromHex("#f8fafc"), -- Slate 50
+	GoalCup = Color3.fromHex("#334155"), -- Slate 700
+
+	-- ★扇風機ギミック
+	FanHousing = Color3.fromHex("#64748b"), -- Slate 500 (外装)
+	FanBlade = Color3.fromHex("#f1f5f9"), -- Slate 100 (羽根)
+	WindZone = Color3.fromHex("#bae6fd"), -- Sky 200 (風の可視化エリア)
 }
 
 -- システムカラー
