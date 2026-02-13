@@ -15,47 +15,51 @@ local BALL_SIZE = 4
 local HOLE_SIZE = 5.5
 local GOAL_THICKNESS = 4
 local GOAL_WIDTH = 12
-local MAGNET_RADIUS = HOLE_SIZE * 1.5
-local MAX_CAPTURE_SPEED = 40
+-- ★修正: 吸い込み範囲を大幅拡大 (1.5 -> 2.5) これで惜しいミスを救済
+local MAGNET_RADIUS = HOLE_SIZE * 2.5
+local MAX_CAPTURE_SPEED = 60 -- 許容速度も上げる
 
--- ■ ステージデータ (修正版)
+-- ■ ステージデータ (配置見直し)
 local STAGE_DATA = {
-	-- Stage 1: 直進 (Wedgeで前へ転がす)
+	-- Stage 1: 直進 (加速強化)
 	[1] = {
 		Start = Vector3.new(0, 15, 0),
-		Goal = Vector3.new(0, -2, -20),
-		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20) },
+		Goal = Vector3.new(0, -2, -25), -- ゴールを少し遠くへ
+		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -25) },
 		Fans = {},
 		TutorialBlocks = {
-			-- スタート真下に、奥(-Z)へ転がる坂を置く
-			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
+			-- 2つの坂で確実に加速させる
+			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) }, -- 1つ目
+			{ Type = "Wedge", Position = Vector3.new(0, 2, -4), Rotation = Vector3.new(0, 0, 0) }, -- 2つ目
 		},
 	},
-	-- Stage 2: 90度反射 (Blockを45度にして反射させる)
+	-- Stage 2: 90度反射 (壁を厚くする)
 	[2] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(20, -2, -20),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20), Vector3.new(20, 2, -20) },
 		Fans = {},
 		TutorialBlocks = {
-			-- スタート地点の加速坂
+			-- 加速坂
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
-			-- 角で45度傾けたブロックで反射させる (Y軸45度回転)
+			-- 反射板 (2枚重ねて当たり判定を広くする)
 			{ Type = "Block", Position = Vector3.new(0, 2, -20), Rotation = Vector3.new(0, 45, 0) },
+			{ Type = "Block", Position = Vector3.new(-2, 2, -22), Rotation = Vector3.new(0, 45, 0) }, -- 裏打ち
 		},
 	},
-	-- Stage 3: 長距離坂道 (Wedgeで加速)
+	-- Stage 3: 長距離坂道
 	[3] = {
 		Start = Vector3.new(0, 30, 20),
 		Goal = Vector3.new(0, -2, -30),
 		Waypoints = { Vector3.new(0, 30, 20), Vector3.new(0, 2, 20), Vector3.new(0, 2, 0), Vector3.new(0, 2, -30) },
 		Fans = {},
 		TutorialBlocks = {
-			-- 着地地点に加速坂
+			-- ガイド通りに
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 20), Rotation = Vector3.new(0, 0, 0) },
+			{ Type = "Wedge", Position = Vector3.new(0, 2, 16), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
-	-- Stage 4: 扇風機 (風に乗せる)
+	-- Stage 4: 扇風機
 	[4] = {
 		Start = Vector3.new(0, 15, 30),
 		Goal = Vector3.new(0, -2, -30),
@@ -69,21 +73,15 @@ local STAGE_DATA = {
 			},
 		},
 		TutorialBlocks = {
-			-- 風に向かって転がす坂
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 30), Rotation = Vector3.new(0, 0, 0) },
+			{ Type = "Block", Position = Vector3.new(0, 2, 26), Rotation = Vector3.new(0, 0, 0) }, -- 足場延長
 		},
 	},
-	-- Stage 5: 風×ジャンプ (風で加速して坂を登る)
+	-- Stage 5: 風×ジャンプ
 	[5] = {
 		Start = Vector3.new(-20, 15, 0),
 		Goal = Vector3.new(20, 10, 0),
-		Waypoints = {
-			Vector3.new(-20, 15, 0),
-			Vector3.new(-20, 2, 0),
-			Vector3.new(0, 2, 0),
-			Vector3.new(15, 5, 0),
-			Vector3.new(20, 10, 0),
-		},
+		Waypoints = { Vector3.new(-20, 15, 0), Vector3.new(-20, 2, 0), Vector3.new(0, 2, 0), Vector3.new(20, 10, 0) },
 		Fans = {
 			{
 				Position = Vector3.new(-10, 2, 0),
@@ -93,12 +91,8 @@ local STAGE_DATA = {
 			},
 		},
 		TutorialBlocks = {
-			-- 1. スタート地点: 右(+X)へ転がす坂 (RotY = -90)
-			{ Type = "Wedge", Position = Vector3.new(-20, 2, 0), Rotation = Vector3.new(0, -90, 0) },
-
-			-- 2. ジャンプ台: 左向きの坂(+Xへ登る) (RotY = 90)
-			-- 風で加速した後、この坂で上へ飛び出す
-			{ Type = "Wedge", Position = Vector3.new(15, 2, 0), Rotation = Vector3.new(0, 90, 0) },
+			{ Type = "Wedge", Position = Vector3.new(-20, 2, 0), Rotation = Vector3.new(0, -90, 0) }, -- 右へ
+			{ Type = "Wedge", Position = Vector3.new(15, 2, 0), Rotation = Vector3.new(0, 90, 0) }, -- 上へ
 		},
 	},
 }
@@ -118,7 +112,7 @@ local startGame
 local loadStage
 local clearUserBlocks
 
--- ■ 風の物理処理
+-- ■ 風処理
 RunService.Heartbeat:Connect(function(dt)
 	if not currentBall or currentBall.Anchored then
 		return
@@ -323,7 +317,8 @@ spawnBall = function()
 	ball.Position = currentStartPos
 	ball.Anchored = true
 	ball.CanCollide = true
-	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.1)
+	-- ★修正: 摩擦(Friction)を下げて、止まりにくくする (0.3 -> 0.05)
+	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.05, 0.1)
 	ball.Parent = workspace
 	currentBall = ball
 	return ball
@@ -479,4 +474,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Tutorial Ghosts Fixed Positions")
+print("GameManager Updated: Larger Magnet & Easier Tutorial")
