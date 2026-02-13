@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
+local mouse = player:GetMouse() -- ★ここを追加しました
 
 -- イベントの取得
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -21,13 +22,13 @@ end
 
 local editFrame = screenGui:WaitForChild("EditFrame")
 
--- ★パスの修正: DrawerMenuの中からボタンを探す
+-- ドロワーメニュー内のボタンを取得
 local drawerMenu = editFrame:WaitForChild("DrawerMenu")
 local buttonBlock = drawerMenu:WaitForChild("ButtonBlock")
 local buttonSphere = drawerMenu:WaitForChild("ButtonSphere")
 local buttonWedge = drawerMenu:WaitForChild("ButtonWedge")
 
--- ★パスの修正: ControlPanelの中からボタンを探す
+-- コントロールパネル内のボタンを取得
 local controlPanel = editFrame:WaitForChild("ControlPanel")
 local buttonRotateX = controlPanel:WaitForChild("ButtonRotateX")
 local buttonRotateY = controlPanel:WaitForChild("ButtonRotateY")
@@ -185,9 +186,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local target = mouse.Target
 		local clickedBlock = false
+		-- PlacedBlock_で始まる名前のパーツかどうか判定
 		if target and target.Name:match("^PlacedBlock_") then
 			clickedBlock = true
 		end
+
 		if not clickedBlock then
 			selectedBlock = nil
 			selectionBox.Adornee = nil
@@ -195,4 +198,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
-print("Placement Controller Reloaded")
+print("Placement Controller Fixed (Mouse Added)")
