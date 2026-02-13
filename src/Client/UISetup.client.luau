@@ -187,7 +187,7 @@ local stageLabel = Instance.new("TextLabel")
 stageLabel.Name = "StageLabel"
 stageLabel.Size = UDim2.new(1, 0, 1, 0)
 stageLabel.BackgroundTransparency = 1
--- ★変更: 大文字のSTAGE
+-- ★修正: 大文字のSTAGE
 stageLabel.Text = "STAGE: 01"
 stageLabel.TextColor3 = Color3.new(1, 1, 1)
 stageLabel.Font = Enum.Font.GothamBold
