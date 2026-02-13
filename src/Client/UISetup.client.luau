@@ -132,11 +132,11 @@ local btnBlock = create3DButton("ButtonBlock", "Block", drawerFrame)
 local btnSphere = create3DButton("ButtonSphere", "Sphere", drawerFrame)
 local btnWedge = create3DButton("ButtonWedge", "Wedge", drawerFrame)
 
--- 2. 操作パネル
+-- 2. 操作パネル（回転）
 local controlPanel = Instance.new("Frame")
 controlPanel.Name = "ControlPanel"
 controlPanel.Size = UDim2.new(0, 260, 0, 80)
-controlPanel.AnchorPoint = Vector2.new(0.5, 1)
+controlPanel.AnchorPoint = Vector2.new(0.5, 1) -- 下中央基準
 controlPanel.Position = UDim2.new(0.5, 0, 0.95, 0)
 controlPanel.Parent = editFrame
 
@@ -149,10 +149,11 @@ panelLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 panelLayout.Padding = UDim.new(0, 15)
 panelLayout.Parent = controlPanel
 
-local function createTextButton(name, text, parent, color)
+-- Helper: テキストボタン（サイズ指定可能に拡張）
+local function createTextButton(name, text, parent, color, size)
 	local btn = Instance.new("TextButton")
 	btn.Name = name
-	btn.Size = UDim2.new(0, 50, 0, 50)
+	btn.Size = size or UDim2.new(0, 50, 0, 50)
 	btn.Text = text
 	btn.TextColor3 = Color3.new(1, 1, 1)
 	btn.Font = Enum.Font.GothamMedium
@@ -175,20 +176,41 @@ local btnRotZ = createTextButton("ButtonRotateZ", "Z", controlPanel, Color3.from
 local headerFrame = Instance.new("Frame")
 headerFrame.Name = "HeaderFrame"
 headerFrame.Size = UDim2.new(0, 180, 0, 50)
-headerFrame.Position = UDim2.new(0.5, 0, 0.08, 0) -- 上部から少し離す
-headerFrame.AnchorPoint = Vector2.new(0.5, 0) -- 中央揃え
+headerFrame.Position = UDim2.new(0.5, 0, 0.08, 0)
+headerFrame.AnchorPoint = Vector2.new(0.5, 0)
 headerFrame.Parent = editFrame
 
-applyGlassStyle(headerFrame, 25) -- 丸角とすりガラス適用
+applyGlassStyle(headerFrame, 25)
 
 local stageLabel = Instance.new("TextLabel")
 stageLabel.Name = "StageLabel"
 stageLabel.Size = UDim2.new(1, 0, 1, 0)
 stageLabel.BackgroundTransparency = 1
 stageLabel.Text = "Stage: 01"
-stageLabel.TextColor3 = Color3.new(1, 1, 1) -- 白文字
+stageLabel.TextColor3 = Color3.new(1, 1, 1)
 stageLabel.Font = Enum.Font.GothamBold
 stageLabel.TextSize = 22
 stageLabel.Parent = headerFrame
 
-print("UI Setup with Stage Header Loaded")
+-- 4. アクションパネル（右下：スタート/リセット）
+local actionPanel = Instance.new("Frame")
+actionPanel.Name = "ActionPanel"
+actionPanel.Size = UDim2.new(0, 180, 0, 80) -- 高さをControlPanel(80)に合わせる
+actionPanel.AnchorPoint = Vector2.new(1, 1) -- 右下基準
+actionPanel.Position = UDim2.new(0.95, 0, 0.95, 0) -- 右端から少し余裕を持たせる（高さはControlPanelと同じ0.95）
+actionPanel.Parent = editFrame
+
+applyGlassStyle(actionPanel, 40)
+
+local actionLayout = Instance.new("UIListLayout")
+actionLayout.FillDirection = Enum.FillDirection.Horizontal
+actionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+actionLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+actionLayout.Padding = UDim.new(0, 15)
+actionLayout.Parent = actionPanel
+
+-- パレットのSystemカラーを使用してボタン作成
+local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
+local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
+
+print("UI Setup Completed: Action Panel Added")
