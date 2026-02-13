@@ -7,7 +7,7 @@ local Palette = require(Shared:WaitForChild("Palette"))
 local GameControlEvent = require(Events.GameControlEvent)
 
 -- 設定
-local GOAL_POSITION = Vector3.new(0, -2, -20) -- Y=-2 (厚さ4なので表面はY=0)
+local GOAL_POSITION = Vector3.new(0, -2, -20)
 local START_POSITION = Vector3.new(0, 15, 0)
 local BALL_SIZE = 4
 local HOLE_SIZE = 5.5
@@ -18,15 +18,18 @@ local GOAL_WIDTH = 12
 local currentBall = nil
 local isGoalLocked = false
 
--- ■ 地面生成関数（4分割法）
--- Baseplateをくり抜くのではなく、ゴールの周囲に4つのパーツを配置して「隙間」を作る
+-- 前方宣言 (これにより、どの関数からでも呼び出せるようになります)
+local spawnBall
+local resetGame
+local startGame
+
+-- ■ 1. 地面生成関数
 local function createFloorWithGap(gapPosition, gapSize)
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if baseplate then
 		baseplate:Destroy()
 	end
 
-	-- 既存の分割地面があれば削除
 	local oldFloor = workspace:FindFirstChild("GeneratedFloor")
 	if oldFloor then
 		oldFloor:Destroy()
@@ -37,9 +40,8 @@ local function createFloorWithGap(gapPosition, gapSize)
 
 	local WORLD_SIZE = 2048
 	local FLOOR_THICKNESS = 4
-	local Y_POS = -2 -- 表面が0になるように
+	local Y_POS = -2
 
-	-- グリッドテクスチャの設定関数
 	local function addGridTexture(part)
 		local texture = Instance.new("Texture")
 		texture.Name = "GridTexture"
@@ -52,12 +54,10 @@ local function createFloorWithGap(gapPosition, gapSize)
 		texture.Parent = part
 	end
 
-	-- 隙間（ゴール）の中心座標
 	local gx, gz = gapPosition.X, gapPosition.Z
 	local gw, gd = gapSize.X, gapSize.Z
 
-	-- 4つのエリアを計算して配置
-	-- 1. 北側 (奥: -Z方向)
+	-- 1. 北側
 	local northSizeZ = (WORLD_SIZE / 2) - (math.abs(gz) + gd / 2)
 	local northPosZ = (gz - gd / 2) - northSizeZ / 2
 	if northSizeZ > 0 then
@@ -72,9 +72,7 @@ local function createFloorWithGap(gapPosition, gapSize)
 		p.Parent = floorModel
 	end
 
-	-- 2. 南側 (手前: +Z方向)
-	local southSizeZ = (WORLD_SIZE / 2) - (math.abs(gz) + gd / 2) -- 簡易計算（中心が0付近前提）
-	-- 正確には (1024 - (gz + gd/2))
+	-- 2. 南側
 	local southStart = gz + gd / 2
 	local southEnd = WORLD_SIZE / 2
 	local sSizeZ = southEnd - southStart
@@ -90,8 +88,7 @@ local function createFloorWithGap(gapPosition, gapSize)
 	addGridTexture(pSouth)
 	pSouth.Parent = floorModel
 
-	-- 3. 西側 (左: -X方向)
-	-- Zの範囲はゴールのZ幅分だけ埋める
+	-- 3. 西側
 	local westStart = -WORLD_SIZE / 2
 	local westEnd = gx - gw / 2
 	local wSizeX = westEnd - westStart
@@ -107,7 +104,7 @@ local function createFloorWithGap(gapPosition, gapSize)
 	addGridTexture(pWest)
 	pWest.Parent = floorModel
 
-	-- 4. 東側 (右: +X方向)
+	-- 4. 東側
 	local eastStart = gx + gw / 2
 	local eastEnd = WORLD_SIZE / 2
 	local eSizeX = eastEnd - eastStart
@@ -126,7 +123,49 @@ local function createFloorWithGap(gapPosition, gapSize)
 	floorModel.Parent = workspace
 end
 
--- ■ ゴール生成関数
+-- ■ 2. ボール生成関数
+spawnBall = function()
+	if currentBall then
+		currentBall:Destroy()
+	end
+
+	local ball = Instance.new("Part")
+	ball.Name = "RedBall"
+	ball.Shape = Enum.PartType.Ball
+	ball.Size = Vector3.new(BALL_SIZE, BALL_SIZE, BALL_SIZE)
+	ball.Color = Palette.Entity.Ball
+	ball.Material = Enum.Material.Plastic
+	ball.Position = START_POSITION
+	ball.Anchored = true
+	ball.CanCollide = true
+	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.1)
+	ball.Parent = workspace
+
+	currentBall = ball
+	return ball
+end
+
+-- ■ 3. ゲーム開始関数
+startGame = function()
+	if currentBall then
+		currentBall.Anchored = false
+		isGoalLocked = false
+		print("Game Started")
+	else
+		spawnBall()
+		currentBall.Anchored = false
+		isGoalLocked = false
+	end
+end
+
+-- ■ 4. リセット関数
+resetGame = function()
+	isGoalLocked = false
+	spawnBall()
+	print("Game Reset")
+end
+
+-- ■ 5. ゴール生成関数 (resetGameを使用するため最後に定義)
 local function spawnGoal()
 	local existingGoal = workspace:FindFirstChild("GoalModel")
 	if existingGoal then
@@ -137,10 +176,10 @@ local function spawnGoal()
 	model.Name = "GoalModel"
 	model.Parent = workspace
 
-	-- 0. 地面を再生成して、ゴールの場所に物理的な穴（隙間）を作る
+	-- 床の再生成（穴あけ）
 	createFloorWithGap(GOAL_POSITION, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
 
-	-- 1. ゴールの土台（芝生）
+	-- ゴール土台
 	local basePart = Instance.new("Part")
 	basePart.Name = "Base"
 	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH)
@@ -148,9 +187,9 @@ local function spawnGoal()
 	basePart.Color = Palette.Entity.GoalBase
 	basePart.Material = Enum.Material.Grass
 	basePart.Anchored = true
-	basePart.Parent = workspace -- 計算用にWorkspaceへ
+	basePart.Parent = workspace
 
-	-- 2. 穴あけ用パーツ
+	-- 穴あけ用パーツ
 	local holeCutter = Instance.new("Part")
 	holeCutter.Name = "Cutter"
 	holeCutter.Shape = Enum.PartType.Cylinder
@@ -158,7 +197,7 @@ local function spawnGoal()
 	holeCutter.Size = Vector3.new(GOAL_THICKNESS * 2, HOLE_SIZE, HOLE_SIZE)
 	holeCutter.Parent = workspace
 
-	-- 3. CSG実行（小さなパーツ同士なら成功しやすい）
+	-- CSG実行
 	local success, result = pcall(function()
 		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.PreciseConvexDecomposition)
 	end)
@@ -172,7 +211,7 @@ local function spawnGoal()
 		basePart:Destroy()
 		holeCutter:Destroy()
 
-		-- 4. カップの底
+		-- カップの底
 		local cupBottom = Instance.new("Part")
 		cupBottom.Name = "CupBottom"
 		cupBottom.Shape = Enum.PartType.Cylinder
@@ -186,7 +225,7 @@ local function spawnGoal()
 			* CFrame.new(-GOAL_THICKNESS / 2 + 0.2, 0, 0)
 		cupBottom.Parent = model
 
-		-- 5. 判定センサー
+		-- 判定センサー
 		local sensor = Instance.new("Part")
 		sensor.Name = "WinSensor"
 		sensor.Size = Vector3.new(0.5, HOLE_SIZE * 0.8, HOLE_SIZE * 0.8)
@@ -202,11 +241,12 @@ local function spawnGoal()
 				isGoalLocked = true
 				print("🎉 GOAL! Stage Cleared!")
 				task.wait(1.5)
+				-- ★ここで resetGame を呼ぶため、この時点で resetGame が定義されている必要がある
 				resetGame()
 			end
 		end)
 
-		-- 6. 旗とポール
+		-- 旗とポール
 		local pole = Instance.new("Part")
 		pole.Name = "Pole"
 		pole.Size = Vector3.new(0.4, 12, 0.4)
@@ -234,47 +274,7 @@ local function spawnGoal()
 	end
 end
 
--- ■ ボール生成
-local function spawnBall()
-	if currentBall then
-		currentBall:Destroy()
-	end
-
-	local ball = Instance.new("Part")
-	ball.Name = "RedBall"
-	ball.Shape = Enum.PartType.Ball
-	ball.Size = Vector3.new(BALL_SIZE, BALL_SIZE, BALL_SIZE)
-	ball.Color = Palette.Entity.Ball
-	ball.Material = Enum.Material.Plastic
-	ball.Position = START_POSITION
-	ball.Anchored = true
-	ball.CanCollide = true
-	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.1)
-	ball.Parent = workspace
-
-	currentBall = ball
-	return ball
-end
-
-local function startGame()
-	if currentBall then
-		currentBall.Anchored = false
-		isGoalLocked = false
-		print("Game Started")
-	else
-		spawnBall()
-		currentBall.Anchored = false
-		isGoalLocked = false
-	end
-end
-
-local function resetGame()
-	isGoalLocked = false
-	spawnBall()
-	print("Game Reset")
-end
-
--- Baseplateを削除して床を作り直すため、EnvironmentSetupの直後に走るようにする
+-- 初期化実行
 task.wait(1)
 spawnGoal()
 spawnBall()
@@ -287,4 +287,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Replaced Baseplate with Gap-Floor System")
+print("GameManager Updated: Fixed Function Ordering")
