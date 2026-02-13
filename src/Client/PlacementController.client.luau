@@ -5,7 +5,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 
 -- イベントの取得
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -21,13 +20,15 @@ if not screenGui then
 end
 
 local editFrame = screenGui:WaitForChild("EditFrame")
+
+-- ★パスの修正: DrawerMenuの中からボタンを探す
+local drawerMenu = editFrame:WaitForChild("DrawerMenu")
+local buttonBlock = drawerMenu:WaitForChild("ButtonBlock")
+local buttonSphere = drawerMenu:WaitForChild("ButtonSphere")
+local buttonWedge = drawerMenu:WaitForChild("ButtonWedge")
+
+-- ★パスの修正: ControlPanelの中からボタンを探す
 local controlPanel = editFrame:WaitForChild("ControlPanel")
-
--- ボタン参照
-local buttonBlock = editFrame:WaitForChild("ButtonBlock")
-local buttonSphere = editFrame:WaitForChild("ButtonSphere")
-local buttonWedge = editFrame:WaitForChild("ButtonWedge")
-
 local buttonRotateX = controlPanel:WaitForChild("ButtonRotateX")
 local buttonRotateY = controlPanel:WaitForChild("ButtonRotateY")
 local buttonRotateZ = controlPanel:WaitForChild("ButtonRotateZ")
@@ -171,28 +172,22 @@ buttonRotateZ.MouseButton1Click:Connect(function()
 	rotateSelectedBlock(Vector3.new(0, 0, 90))
 end)
 
--- ■ 入力処理（ショートカット ＆ 選択解除）
+-- ■ 入力処理
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
 
-	-- Rキー: 回転ショートカット
 	if input.KeyCode == Enum.KeyCode.R then
 		rotateSelectedBlock(Vector3.new(0, 90, 0))
 	end
 
-	-- 左クリック: 選択解除の判定
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local target = mouse.Target
 		local clickedBlock = false
-
-		-- クリックした対象が配置ブロックかチェック
 		if target and target.Name:match("^PlacedBlock_") then
 			clickedBlock = true
 		end
-
-		-- ブロック以外（何もない空間や地面）をクリックしたら選択解除
 		if not clickedBlock then
 			selectedBlock = nil
 			selectionBox.Adornee = nil
@@ -200,4 +195,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
-print("Placement Controller with Deselection Loaded")
+print("Placement Controller Reloaded")
