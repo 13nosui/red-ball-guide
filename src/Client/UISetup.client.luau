@@ -129,8 +129,8 @@ local btnWedge = create3DButton("ButtonWedge", "Wedge", drawerFrame)
 -- 2. 操作パネル（移動＆回転）
 local controlPanel = Instance.new("Frame")
 controlPanel.Name = "ControlPanel"
--- 幅を広げて移動ボタン用のスペースを確保
-controlPanel.Size = UDim2.new(0, 500, 0, 80)
+-- 幅を500から620に拡張してボタンが収まるように修正
+controlPanel.Size = UDim2.new(0, 620, 0, 80)
 controlPanel.AnchorPoint = Vector2.new(0.5, 1)
 controlPanel.Position = UDim2.new(0.5, 0, 0.95, 0)
 controlPanel.Parent = editFrame
@@ -141,7 +141,7 @@ local panelLayout = Instance.new("UIListLayout")
 panelLayout.FillDirection = Enum.FillDirection.Horizontal
 panelLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 panelLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-panelLayout.Padding = UDim.new(0, 10) -- パディングを少し詰める
+panelLayout.Padding = UDim.new(0, 10)
 panelLayout.Parent = controlPanel
 
 -- Helper: テキストボタン
@@ -160,31 +160,24 @@ local function createTextButton(name, text, parent, color, size)
 	return btn
 end
 
--- ■ 移動ボタン群（左側）
+-- ■ ボタン配置（順序修正）
 local moveColor = Palette.System.Move
--- 上昇/下降
-local btnUp = createTextButton("ButtonUp", "Up", controlPanel, moveColor)
-local btnDown = createTextButton("ButtonDown", "Down", controlPanel, moveColor)
 
--- 区切り線（装飾）
-local separator = Instance.new("Frame")
-separator.Name = "Separator"
-separator.Size = UDim2.new(0, 2, 0, 40)
-separator.BackgroundColor3 = Color3.new(1, 1, 1)
-separator.BackgroundTransparency = 0.8
-separator.Parent = controlPanel
-
--- 平面移動（←, ↑, ↓, →）※矢印記号を使用
-local btnLeft = createTextButton("ButtonLeft", "←", controlPanel, moveColor)
-local btnForward = createTextButton("ButtonForward", "↑", controlPanel, moveColor)
+-- 1. ↓ (Backward / 手前)
 local btnBackward = createTextButton("ButtonBackward", "↓", controlPanel, moveColor)
+-- 2. ↑ (Forward / 奥)
+local btnForward = createTextButton("ButtonForward", "↑", controlPanel, moveColor)
+-- 3. ← (Left)
+local btnLeft = createTextButton("ButtonLeft", "←", controlPanel, moveColor)
+-- 4. → (Right)
 local btnRight = createTextButton("ButtonRight", "→", controlPanel, moveColor)
 
--- 区切り線
-local separator2 = separator:Clone()
-separator2.Parent = controlPanel
+-- 5. Down (下降)
+local btnDown = createTextButton("ButtonDown", "Down", controlPanel, moveColor)
+-- 6. Up (上昇)
+local btnUp = createTextButton("ButtonUp", "Up", controlPanel, moveColor)
 
--- ■ 回転ボタン群（右側・既存）
+-- 7-9. 回転ボタン (Rot X, Y, Z)
 local btnRotX =
 	createTextButton("ButtonRotateX", "Rot X", controlPanel, Color3.fromRGB(255, 80, 80), UDim2.new(0, 60, 0, 50))
 local btnRotY =
@@ -230,4 +223,4 @@ actionLayout.Parent = actionPanel
 local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
 local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
 
-print("UI Setup with Move Controller Loaded")
+print("UI Setup: Layout Fixed and Reordered")
