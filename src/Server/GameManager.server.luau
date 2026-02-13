@@ -7,16 +7,65 @@ local Palette = require(Shared:WaitForChild("Palette"))
 local GameControlEvent = require(Events.GameControlEvent)
 
 -- 設定
-local GOAL_POSITION = Vector3.new(0, 3, -20)
+-- ゴールの表面をY=0（Baseplateと同じ）にするための設定
+-- Baseplate(厚さ4, Y=-2)に合わせて、ゴールも厚さ4, Y=-2に設定して埋め込む
+local GOAL_POSITION = Vector3.new(0, -2, -20)
 local START_POSITION = Vector3.new(0, 15, 0)
 local BALL_SIZE = 4
 local HOLE_SIZE = 5.5
-local GOAL_HEIGHT = 6
+local GOAL_THICKNESS = 4
 local GOAL_WIDTH = 12
 
 -- 状態
 local currentBall = nil
 local isGoalLocked = false
+
+-- ■ Baseplateの加工処理（ゴール部分をくり抜く）
+local function cutBaseplateForGoal(targetCFrame, size)
+	local baseplate = workspace:FindFirstChild("Baseplate")
+	if not baseplate then
+		return
+	end
+
+	-- 既に加工済み（Union）なら再加工しない（エラー防止）
+	if baseplate:IsA("UnionOperation") and baseplate.Name == "BaseplateWithHole" then
+		return
+	end
+
+	print("Cutting Baseplate to fit goal...")
+
+	local cutter = Instance.new("Part")
+	cutter.Name = "BaseplateCutter"
+	cutter.Size = Vector3.new(size.X, 20, size.Z) -- 確実に貫通させるため高さを盛る
+	cutter.CFrame = targetCFrame
+	cutter.Anchored = true
+	cutter.Parent = workspace
+
+	local success, result = pcall(function()
+		return baseplate:SubtractAsync({ cutter }, Enum.CollisionFidelity.Default)
+	end)
+
+	if success and result then
+		-- 元のBaseplateのプロパティを引き継ぐ
+		result.Name = "BaseplateWithHole" -- 名前を変えて再加工防止
+		result.Anchored = true
+		result.CanCollide = true
+		result.Parent = workspace
+
+		-- テクスチャがあれば移植する
+		for _, child in pairs(baseplate:GetChildren()) do
+			if child:IsA("Texture") then
+				child.Parent = result
+			end
+		end
+
+		baseplate:Destroy()
+	else
+		warn("Failed to cut Baseplate:", result)
+	end
+
+	cutter:Destroy()
+end
 
 -- ■ ゴール生成関数
 local function spawnGoal()
@@ -27,29 +76,32 @@ local function spawnGoal()
 
 	local model = Instance.new("Model")
 	model.Name = "GoalModel"
-	model.Parent = workspace -- モデルを先にWorkspaceに置く
+	model.Parent = workspace
 
-	-- 1. 土台（ベース）
+	-- 0. Baseplateに穴を空ける（場所を作る）
+	-- ゴールブロックと同じサイズ・位置でBaseplateをくり抜く
+	cutBaseplateForGoal(CFrame.new(GOAL_POSITION), Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
+
+	-- 1. ゴールの土台（芝生部分）
 	local basePart = Instance.new("Part")
 	basePart.Name = "Base"
-	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_HEIGHT, GOAL_WIDTH)
+	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH)
 	basePart.CFrame = CFrame.new(GOAL_POSITION)
 	basePart.Color = Palette.Entity.GoalBase
 	basePart.Material = Enum.Material.Grass
 	basePart.Anchored = true
-	basePart.Parent = workspace -- ★重要: 計算前にWorkspaceに置く
+	basePart.Parent = workspace -- CSG用に一時配置
 
-	-- 2. 穴あけ用パーツ
+	-- 2. カップの穴あけ用パーツ
 	local holeCutter = Instance.new("Part")
 	holeCutter.Name = "Cutter"
 	holeCutter.Shape = Enum.PartType.Cylinder
 	holeCutter.CFrame = basePart.CFrame * CFrame.Angles(0, 0, math.rad(90))
-	holeCutter.Size = Vector3.new(10, HOLE_SIZE, HOLE_SIZE)
-	holeCutter.Parent = workspace -- ★重要: 計算前にWorkspaceに置く
+	holeCutter.Size = Vector3.new(GOAL_THICKNESS * 2, HOLE_SIZE, HOLE_SIZE)
+	holeCutter.Parent = workspace
 
-	-- 3. CSG実行
+	-- 3. CSG実行（芝生ブロックに穴を空ける）
 	local success, result = pcall(function()
-		-- CollisionFidelity.Default で安定化
 		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.Default)
 	end)
 
@@ -57,13 +109,12 @@ local function spawnGoal()
 		local unionGoal = result
 		unionGoal.Name = "GoalCup"
 		unionGoal.Anchored = true
-		unionGoal.Parent = model -- 完成品をモデルに入れる
+		unionGoal.Parent = model
 
-		-- 計算に使った元のパーツは破棄
 		basePart:Destroy()
 		holeCutter:Destroy()
 
-		-- ★カップの底（見た目）
+		-- 4. カップの底（見た目）
 		local cupBottom = Instance.new("Part")
 		cupBottom.Name = "CupBottom"
 		cupBottom.Shape = Enum.PartType.Cylinder
@@ -72,10 +123,13 @@ local function spawnGoal()
 		cupBottom.Material = Enum.Material.Plastic
 		cupBottom.Anchored = true
 		cupBottom.CanCollide = true
-		cupBottom.CFrame = unionGoal.CFrame * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(-GOAL_HEIGHT / 4, 0, 0)
+		-- 底の位置調整
+		cupBottom.CFrame = unionGoal.CFrame
+			* CFrame.Angles(0, 0, math.rad(90))
+			* CFrame.new(-GOAL_THICKNESS / 2 + 0.2, 0, 0)
 		cupBottom.Parent = model
 
-		-- 4. 判定センサー
+		-- 5. 判定センサー
 		local sensor = Instance.new("Part")
 		sensor.Name = "WinSensor"
 		sensor.Size = Vector3.new(0.5, HOLE_SIZE * 0.8, HOLE_SIZE * 0.8)
@@ -95,7 +149,7 @@ local function spawnGoal()
 			end
 		end)
 
-		-- 5. 旗とポール
+		-- 6. 旗とポール
 		local pole = Instance.new("Part")
 		pole.Name = "Pole"
 		pole.Size = Vector3.new(0.4, 12, 0.4)
@@ -103,7 +157,8 @@ local function spawnGoal()
 		pole.Color = Palette.Entity.GoalPole
 		pole.Anchored = true
 		pole.CanCollide = false
-		pole.CFrame = unionGoal.CFrame * CFrame.new(0, 5, -4)
+		-- 位置調整（表面Y=0から生やす）
+		pole.CFrame = CFrame.new(GOAL_POSITION.X, 0 + 6, GOAL_POSITION.Z - 4)
 		pole.Parent = model
 
 		local flag = Instance.new("Part")
@@ -114,31 +169,8 @@ local function spawnGoal()
 		flag.CanCollide = false
 		flag.CFrame = pole.CFrame * CFrame.new(0, 4, -2)
 		flag.Parent = model
-
-		-- ★4方向のスロープ（坂）
-		local rampLength = 12
-		local directions = {
-			{ dir = Vector3.new(0, 0, 1), rot = 0 }, -- 手前
-			{ dir = Vector3.new(0, 0, -1), rot = 180 }, -- 奥
-			{ dir = Vector3.new(-1, 0, 0), rot = -90 }, -- 左
-			{ dir = Vector3.new(1, 0, 0), rot = 90 }, -- 右
-		}
-
-		for _, d in ipairs(directions) do
-			local ramp = Instance.new("WedgePart")
-			ramp.Name = "GoalRamp"
-			ramp.Size = Vector3.new(GOAL_WIDTH, GOAL_HEIGHT, rampLength)
-			ramp.Color = Palette.Entity.GoalBase
-			ramp.Material = Enum.Material.Grass
-			ramp.Anchored = true
-
-			local offset = (GOAL_WIDTH / 2 + rampLength / 2) * d.dir
-			ramp.CFrame = CFrame.new(GOAL_POSITION + offset) * CFrame.Angles(0, math.rad(d.rot), 0)
-			ramp.Parent = model
-		end
 	else
 		warn("Failed to create goal geometry:", result)
-		-- 失敗時は元のパーツをモデルに戻して表示しておく
 		basePart.Parent = model
 		if holeCutter then
 			holeCutter:Destroy()
@@ -186,6 +218,8 @@ local function resetGame()
 	print("Game Reset")
 end
 
+-- Baseplateの生成を待つ（EnvironmentSetupの実行待ち）
+task.wait(1)
 spawnGoal()
 spawnBall()
 
@@ -197,4 +231,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: CSG Fix (Parented to Workspace)")
+print("GameManager Updated: Flush Goal (Embedded in Baseplate)")
