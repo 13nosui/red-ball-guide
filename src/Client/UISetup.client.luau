@@ -129,7 +129,6 @@ local btnWedge = create3DButton("ButtonWedge", "Wedge", drawerFrame)
 -- 2. 操作パネル（移動＆回転）
 local controlPanel = Instance.new("Frame")
 controlPanel.Name = "ControlPanel"
--- 幅を500から620に拡張してボタンが収まるように修正
 controlPanel.Size = UDim2.new(0, 620, 0, 80)
 controlPanel.AnchorPoint = Vector2.new(0.5, 1)
 controlPanel.Position = UDim2.new(0.5, 0, 0.95, 0)
@@ -142,10 +141,11 @@ panelLayout.FillDirection = Enum.FillDirection.Horizontal
 panelLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 panelLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 panelLayout.Padding = UDim.new(0, 10)
+panelLayout.SortOrder = Enum.SortOrder.LayoutOrder -- ★順序指定モードにする
 panelLayout.Parent = controlPanel
 
--- Helper: テキストボタン
-local function createTextButton(name, text, parent, color, size)
+-- Helper: テキストボタン (LayoutOrder引数を追加)
+local function createTextButton(name, text, parent, color, size, layoutOrder)
 	local btn = Instance.new("TextButton")
 	btn.Name = name
 	btn.Size = size or UDim2.new(0, 50, 0, 50)
@@ -153,6 +153,7 @@ local function createTextButton(name, text, parent, color, size)
 	btn.TextColor3 = Color3.new(1, 1, 1)
 	btn.Font = Enum.Font.GothamMedium
 	btn.TextSize = 16
+	btn.LayoutOrder = layoutOrder or 0 -- ★表示順序を設定
 	btn.Parent = parent
 	applyGlassStyle(btn, 25)
 	btn.BackgroundColor3 = color
@@ -160,30 +161,30 @@ local function createTextButton(name, text, parent, color, size)
 	return btn
 end
 
--- ■ ボタン配置（順序修正）
+-- ■ ボタン配置（LayoutOrderを指定して順序を保証）
 local moveColor = Palette.System.Move
 
 -- 1. ↓ (Backward / 手前)
-local btnBackward = createTextButton("ButtonBackward", "↓", controlPanel, moveColor)
+local btnBackward = createTextButton("ButtonBackward", "↓", controlPanel, moveColor, nil, 1)
 -- 2. ↑ (Forward / 奥)
-local btnForward = createTextButton("ButtonForward", "↑", controlPanel, moveColor)
+local btnForward = createTextButton("ButtonForward", "↑", controlPanel, moveColor, nil, 2)
 -- 3. ← (Left)
-local btnLeft = createTextButton("ButtonLeft", "←", controlPanel, moveColor)
+local btnLeft = createTextButton("ButtonLeft", "←", controlPanel, moveColor, nil, 3)
 -- 4. → (Right)
-local btnRight = createTextButton("ButtonRight", "→", controlPanel, moveColor)
+local btnRight = createTextButton("ButtonRight", "→", controlPanel, moveColor, nil, 4)
 
 -- 5. Down (下降)
-local btnDown = createTextButton("ButtonDown", "Down", controlPanel, moveColor)
+local btnDown = createTextButton("ButtonDown", "Down", controlPanel, moveColor, nil, 5)
 -- 6. Up (上昇)
-local btnUp = createTextButton("ButtonUp", "Up", controlPanel, moveColor)
+local btnUp = createTextButton("ButtonUp", "Up", controlPanel, moveColor, nil, 6)
 
 -- 7-9. 回転ボタン (Rot X, Y, Z)
 local btnRotX =
-	createTextButton("ButtonRotateX", "Rot X", controlPanel, Color3.fromRGB(255, 80, 80), UDim2.new(0, 60, 0, 50))
+	createTextButton("ButtonRotateX", "Rot X", controlPanel, Color3.fromRGB(255, 80, 80), UDim2.new(0, 60, 0, 50), 7)
 local btnRotY =
-	createTextButton("ButtonRotateY", "Rot Y", controlPanel, Color3.fromRGB(80, 255, 80), UDim2.new(0, 60, 0, 50))
+	createTextButton("ButtonRotateY", "Rot Y", controlPanel, Color3.fromRGB(80, 255, 80), UDim2.new(0, 60, 0, 50), 8)
 local btnRotZ =
-	createTextButton("ButtonRotateZ", "Rot Z", controlPanel, Color3.fromRGB(80, 80, 255), UDim2.new(0, 60, 0, 50))
+	createTextButton("ButtonRotateZ", "Rot Z", controlPanel, Color3.fromRGB(80, 80, 255), UDim2.new(0, 60, 0, 50), 9)
 
 -- 3. ヘッダー
 local headerFrame = Instance.new("Frame")
@@ -223,4 +224,4 @@ actionLayout.Parent = actionPanel
 local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
 local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
 
-print("UI Setup: Layout Fixed and Reordered")
+print("UI Setup: Button Order Fixed with LayoutOrder")
