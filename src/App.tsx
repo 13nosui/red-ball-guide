@@ -2,33 +2,27 @@ import React, { Suspense, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { PerspectiveCamera, OrbitControls } from '@react-three/drei';
 import { Physics } from '@react-three/rapier';
-// ▼ 十字キー用のアイコンを追加インポート ▼
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RotateCw, Play, Square, RotateCcw, Trophy } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Play, Square, RotateCcw, Trophy } from 'lucide-react';
 import { Experience } from './components/Experience';
 import * as THREE from 'three';
 import { useStore } from './store/useStore';
 
-/**
- * 2. UI COMPONENTS
- */
 function GameUI() {
     const { isPlaying, togglePlay, reset, rotateSlope, moveSlope, gameStatus } = useStore();
 
     if (gameStatus === 'cleared') return <ClearScreen />;
 
-    // --- スタイル定義 ---
     const bottomBarContainer: React.CSSProperties = {
         position: 'absolute',
         bottom: '30px',
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
-        gap: '40px', // 十字キーとアクションボタンの間の隙間
+        gap: '40px',
         alignItems: 'flex-end',
         pointerEvents: 'auto',
     };
 
-    // 十字キーを3x3のグリッドで配置
     const dpadContainer: React.CSSProperties = {
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 50px)',
@@ -39,39 +33,16 @@ function GameUI() {
     const actionContainer: React.CSSProperties = {
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: '8px',
+        width: '160px', // 右側のボタンエリアの幅を固定
     };
 
-    const actionRow: React.CSSProperties = {
-        display: 'flex',
-        gap: '12px',
-    };
-
-    // 基本のボタンデザイン
     const btnStyle = (isActive = false): React.CSSProperties => ({
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#111',
-        color: isActive ? '#4ade80' : '#fff',
-        border: `1px solid ${isActive ? '#4ade80' : '#444'}`,
-        borderRadius: '8px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: isPlaying ? 'not-allowed' : 'pointer',
-        opacity: isPlaying ? 0.5 : 1, // 再生中は半透明にして押せない感触を出す
-        outline: 'none',
+        width: '100%', height: '100%', backgroundColor: '#111',
+        color: isActive ? '#4ade80' : '#fff', border: `1px solid ${isActive ? '#4ade80' : '#444'}`,
+        borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: isPlaying ? 'not-allowed' : 'pointer', opacity: isPlaying ? 0.5 : 1, outline: 'none',
     });
-
-    // 再生ボタンは特別（プレイ中も押せるのでopacityを下げない）
-    const playBtnStyle: React.CSSProperties = {
-        ...btnStyle(isPlaying),
-        cursor: 'pointer',
-        opacity: 1,
-        height: '60px',
-        borderColor: isPlaying ? '#4ade80' : '#f87171',
-        color: isPlaying ? '#4ade80' : '#f87171',
-    };
 
     return (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -80,49 +51,46 @@ function GameUI() {
             </div>
 
             <div style={bottomBarContainer}>
-                {/* ▼ 左側: 十字キー (D-Pad) ▼ */}
+                {/* 左側: 十字キー */}
                 <div style={dpadContainer}>
-                    <div /> {/* 左上 空白 */}
-                    <button style={btnStyle()} disabled={isPlaying} onClick={() => moveSlope(0, -1)}>
-                        <ChevronUp size={28} />
-                    </button>
-                    <div /> {/* 右上 空白 */}
-
-                    <button style={btnStyle()} disabled={isPlaying} onClick={() => moveSlope(-1, 0)}>
-                        <ChevronLeft size={28} />
-                    </button>
-                    <div /> {/* 中央 空白 */}
-                    <button style={btnStyle()} disabled={isPlaying} onClick={() => moveSlope(1, 0)}>
-                        <ChevronRight size={28} />
-                    </button>
-
-                    <div /> {/* 左下 空白 */}
-                    <button style={btnStyle()} disabled={isPlaying} onClick={() => moveSlope(0, 1)}>
-                        <ChevronDown size={28} />
-                    </button>
-                    <div /> {/* 右下 空白 */}
+                    <div />
+                    <button style={btnStyle()} disabled={isPlaying} onClick={() => moveSlope(0, -1)}><ChevronUp size={28} /></button>
+                    <div />
+                    <button style={btnStyle()} disabled={isPlaying} onClick={() => moveSlope(-1, 0)}><ChevronLeft size={28} /></button>
+                    <div />
+                    <button style={btnStyle()} disabled={isPlaying} onClick={() => moveSlope(1, 0)}><ChevronRight size={28} /></button>
+                    <div />
+                    <button style={btnStyle()} disabled={isPlaying} onClick={() => moveSlope(0, 1)}><ChevronDown size={28} /></button>
+                    <div />
                 </div>
 
-                {/* ▼ 右側: アクションボタン ▼ */}
+                {/* 右側: アクションボタン */}
                 <div style={actionContainer}>
-                    <div style={actionRow}>
-                        <button style={{ ...btnStyle(), width: '60px', height: '60px' }} disabled={isPlaying} onClick={rotateSlope} title="Rotate">
-                            <RotateCw size={24} />
+                    {/* ▼ XYZ独立回転ボタン ▼ */}
+                    <div style={{ display: 'flex', gap: '6px', height: '40px' }}>
+                        <button style={{ ...btnStyle(), fontSize: '12px', fontWeight: 'bold' }} disabled={isPlaying} onClick={() => rotateSlope('x')}>Rx</button>
+                        <button style={{ ...btnStyle(), fontSize: '12px', fontWeight: 'bold' }} disabled={isPlaying} onClick={() => rotateSlope('y')}>Ry</button>
+                        <button style={{ ...btnStyle(), fontSize: '12px', fontWeight: 'bold' }} disabled={isPlaying} onClick={() => rotateSlope('z')}>Rz</button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px', height: '60px' }}>
+                        <button
+                            style={{ ...btnStyle(isPlaying), flex: 2, cursor: 'pointer', opacity: 1, borderColor: isPlaying ? '#4ade80' : '#f87171', color: isPlaying ? '#4ade80' : '#f87171' }}
+                            onClick={togglePlay}
+                        >
+                            {isPlaying ? <Square size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
                         </button>
-                        <button style={{ ...btnStyle(), width: '60px', height: '60px' }} onClick={reset} title="Reset">
-                            <RotateCcw size={24} />
+                        <button style={{ ...btnStyle(), flex: 1 }} onClick={reset} title="Reset">
+                            <RotateCcw size={20} />
                         </button>
                     </div>
-                    <button style={playBtnStyle} onClick={togglePlay}>
-                        {isPlaying ? <Square size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
-                    </button>
                 </div>
             </div>
         </div>
     );
 }
 
-// ... ClearScreen, ResponsiveCamera, App コンポーネントは前回のまま変更なし ...
+// ... ClearScreen, ResponsiveCamera, App コンポーネントは変更なし ...
 function ClearScreen() {
     const reset = useStore((state) => state.reset);
     return (
@@ -133,16 +101,7 @@ function ClearScreen() {
         }}>
             <Trophy size={80} color="#FFD000" style={{ marginBottom: '20px' }} />
             <h1 style={{ color: '#fff', fontSize: '48px', fontWeight: 900, margin: 0, letterSpacing: '4px' }}>CLEAR!!</h1>
-            <button
-                onClick={reset}
-                style={{
-                    padding: '16px 48px', fontSize: '18px', fontWeight: 'bold', marginTop: '40px',
-                    backgroundColor: '#FFD000', color: '#000', border: 'none',
-                    borderRadius: '50px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255, 208, 0, 0.4)'
-                }}
-            >
-                REPLAY
-            </button>
+            <button onClick={reset} style={{ padding: '16px 48px', fontSize: '18px', fontWeight: 'bold', marginTop: '40px', backgroundColor: '#FFD000', color: '#000', border: 'none', borderRadius: '50px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255, 208, 0, 0.4)' }}>REPLAY</button>
         </div>
     );
 }
@@ -151,9 +110,7 @@ function ResponsiveCamera() {
     const { camera, size } = useThree();
     useEffect(() => {
         const aspect = size.width / size.height;
-        const fov = 60;
-        const targetVisibleWidth = 14;
-        const distance = (targetVisibleWidth / 2) / (Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect);
+        const distance = (14 / 2) / (Math.tan(THREE.MathUtils.degToRad(30)) * aspect);
         camera.position.set(0, distance, distance);
         camera.lookAt(0, 0, 0);
         camera.updateProjectionMatrix();
@@ -167,21 +124,8 @@ export default function App() {
             <Canvas shadows gl={{ antialias: false, pixelRatio: 1 }}>
                 <PerspectiveCamera makeDefault position={[0, 20, 20]} fov={60} />
                 <ResponsiveCamera />
-                <OrbitControls
-                    makeDefault
-                    enableZoom={true}
-                    enablePan={true}
-                    enableRotate={true}
-                    minAzimuthAngle={-Math.PI / 4}
-                    maxAzimuthAngle={Math.PI / 4}
-                    minPolarAngle={Math.PI / 6}
-                    maxPolarAngle={Math.PI / 2.5}
-                />
-                <Suspense fallback={null}>
-                    <Physics gravity={[0, -9.81, 0]}>
-                        <Experience />
-                    </Physics>
-                </Suspense>
+                <OrbitControls makeDefault enableZoom={true} enablePan={true} enableRotate={true} minAzimuthAngle={-Math.PI / 4} maxAzimuthAngle={Math.PI / 4} minPolarAngle={Math.PI / 6} maxPolarAngle={Math.PI / 2.5} />
+                <Suspense fallback={null}><Physics gravity={[0, -9.81, 0]}><Experience /></Physics></Suspense>
             </Canvas>
             <GameUI />
         </div>

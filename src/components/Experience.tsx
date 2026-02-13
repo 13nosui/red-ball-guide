@@ -18,10 +18,11 @@ export function Experience() {
             <Physics gravity={[0, -9.81, 0]}>
                 <Player />
 
-                {/* ▼ onClickを削除し、ただの「ボール落下防止用の見えない床」に戻す ▼ */}
-                <RigidBody type="fixed" position={[0, -6, 0]} friction={0.5}>
+                {/* ▼ 厚みを持たせた見えない床（トンネリング防止） ▼ */}
+                <RigidBody type="fixed" position={[0, -6.9, 0]} friction={0.5}>
                     <mesh visible={false}>
-                        <boxGeometry args={[100, 0.2, 100]} />
+                        {/* 厚さを 0.2 から 2 に変更。上面の高さは以前と同じになるよう調整済み */}
+                        <boxGeometry args={[100, 2, 100]} />
                         <meshStandardMaterial color="black" />
                     </mesh>
                 </RigidBody>
@@ -71,7 +72,7 @@ function MovableSlope() {
     const slopeRot = useStore((state) => state.slopeRot);
 
     return (
-        <RigidBody type="kinematicPosition" position={slopePos} rotation={[0, 0, slopeRot]}>
+        <RigidBody type="kinematicPosition" position={slopePos} rotation={slopeRot}>
             <mesh castShadow receiveShadow>
                 <cylinderGeometry args={[1, 1, 2, 3]} />
                 <meshStandardMaterial color="#fbbf24" roughness={0.8} flatShading={true} />

@@ -6,22 +6,23 @@ interface GameState {
     gameStatus: GameStatus;
     isPlaying: boolean;
     slopePos: [number, number, number];
-    slopeRot: number;
+    // ▼ 回転をXYZの配列に変更 ▼
+    slopeRot: [number, number, number];
 
     togglePlay: () => void;
     reset: () => void;
     setGameStatus: (status: GameStatus) => void;
 
-    // ▼ スロープ操作用の関数 ▼
     moveSlope: (dx: number, dz: number) => void;
-    rotateSlope: () => void;
+    // ▼ 引数で x, y, z を受け取るように変更 ▼
+    rotateSlope: (axis: 'x' | 'y' | 'z') => void;
 }
 
 export const useStore = create<GameState>((set) => ({
     gameStatus: 'ready',
     isPlaying: false,
     slopePos: [2, -4.9, 0],
-    slopeRot: 0,
+    slopeRot: [0, 0, 0], // 初期状態はすべて0度
 
     togglePlay: () => set((state) => ({
         isPlaying: !state.isPlaying,
@@ -32,12 +33,11 @@ export const useStore = create<GameState>((set) => ({
         isPlaying: false,
         gameStatus: 'ready',
         slopePos: [2, -4.9, 0],
-        slopeRot: 0
+        slopeRot: [0, 0, 0] // リセット時も配列に戻す
     }),
 
     setGameStatus: (status) => set({ gameStatus: status }),
 
-    // ▼ 十字キーで呼び出される移動関数（再生中は動かせない） ▼
     moveSlope: (dx, dz) => set((state) => {
         if (state.isPlaying) return state;
         return {
@@ -45,8 +45,13 @@ export const useStore = create<GameState>((set) => ({
         };
     }),
 
-    rotateSlope: () => set((state) => {
+    // ▼ 指定された軸だけ90度（Math.PI / 2）回転させる ▼
+    rotateSlope: (axis) => set((state) => {
         if (state.isPlaying) return state;
-        return { slopeRot: state.slopeRot + Math.PI / 2 };
+        const newRot = [...state.slopeRot] as [number, number, number];
+        if (axis === 'x') newRot[0] += Math.PI / 2;
+        if (axis === 'y') newRot[1] += Math.PI / 2;
+        if (axis === 'z') newRot[2] += Math.PI / 2;
+        return { slopeRot: newRot };
     }),
 }));
