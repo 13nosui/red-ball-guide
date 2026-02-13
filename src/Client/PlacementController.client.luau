@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
+local mouse = player:GetMouse()
 
 -- イベントの取得
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -20,13 +21,13 @@ if not screenGui then
 end
 
 local editFrame = screenGui:WaitForChild("EditFrame")
--- ドロワーのボタン（editFrame直下にある前提）
+local controlPanel = editFrame:WaitForChild("ControlPanel")
+
+-- ボタン参照
 local buttonBlock = editFrame:WaitForChild("ButtonBlock")
 local buttonSphere = editFrame:WaitForChild("ButtonSphere")
 local buttonWedge = editFrame:WaitForChild("ButtonWedge")
 
--- 回転ボタン（ControlPanelの下にある）
-local controlPanel = editFrame:WaitForChild("ControlPanel")
 local buttonRotateX = controlPanel:WaitForChild("ButtonRotateX")
 local buttonRotateY = controlPanel:WaitForChild("ButtonRotateY")
 local buttonRotateZ = controlPanel:WaitForChild("ButtonRotateZ")
@@ -153,34 +154,50 @@ UpdateBlockEvent.OnClientEvent:Connect(function(block)
 	end
 end)
 
--- ■ 回転処理（3軸対応）
+-- ■ 回転処理
 local function rotateSelectedBlock(degreesVector)
 	if selectedBlock and selectedBlock.Parent then
 		UpdateBlockEvent:FireServer(selectedBlock, "rotate", degreesVector)
 	end
 end
 
--- 各ボタンに軸ごとの回転を割り当て
 buttonRotateX.MouseButton1Click:Connect(function()
 	rotateSelectedBlock(Vector3.new(90, 0, 0))
 end)
-
 buttonRotateY.MouseButton1Click:Connect(function()
 	rotateSelectedBlock(Vector3.new(0, 90, 0))
 end)
-
 buttonRotateZ.MouseButton1Click:Connect(function()
 	rotateSelectedBlock(Vector3.new(0, 0, 90))
 end)
 
--- RキーはY軸回転（デフォルト）
+-- ■ 入力処理（ショートカット ＆ 選択解除）
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
+
+	-- Rキー: 回転ショートカット
 	if input.KeyCode == Enum.KeyCode.R then
 		rotateSelectedBlock(Vector3.new(0, 90, 0))
 	end
+
+	-- 左クリック: 選択解除の判定
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		local target = mouse.Target
+		local clickedBlock = false
+
+		-- クリックした対象が配置ブロックかチェック
+		if target and target.Name:match("^PlacedBlock_") then
+			clickedBlock = true
+		end
+
+		-- ブロック以外（何もない空間や地面）をクリックしたら選択解除
+		if not clickedBlock then
+			selectedBlock = nil
+			selectionBox.Adornee = nil
+		end
+	end
 end)
 
-print("Placement Controller with 3-Axis Rotation Loaded")
+print("Placement Controller with Deselection Loaded")
