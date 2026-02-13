@@ -38,8 +38,9 @@ end)
 
 -- ステージ更新イベント
 UpdateStageEvent.OnClientEvent:Connect(function(stageIndex)
-	stageLabel.Text = "Stage: " .. string.format("%02d", stageIndex)
-	print("UI Updated to Stage " .. stageIndex)
+	-- ★修正: ここも大文字のSTAGEにする必要があります
+	stageLabel.Text = "STAGE: " .. string.format("%02d", stageIndex)
+	print("UI Updated to STAGE " .. stageIndex)
 end)
 
-print("GameController Loaded with Stage Display Support")
+print("GameController Loaded with Uppercase STAGE Display")
