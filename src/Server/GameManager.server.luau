@@ -15,51 +15,42 @@ local BALL_SIZE = 4
 local HOLE_SIZE = 5.5
 local GOAL_THICKNESS = 4
 local GOAL_WIDTH = 12
--- ★修正: 吸い込み範囲を大幅拡大 (1.5 -> 2.5) これで惜しいミスを救済
 local MAGNET_RADIUS = HOLE_SIZE * 2.5
-local MAX_CAPTURE_SPEED = 60 -- 許容速度も上げる
+local MAX_CAPTURE_SPEED = 60
 
--- ■ ステージデータ (配置見直し)
+-- ■ ステージデータ
 local STAGE_DATA = {
-	-- Stage 1: 直進 (加速強化)
 	[1] = {
 		Start = Vector3.new(0, 15, 0),
-		Goal = Vector3.new(0, -2, -25), -- ゴールを少し遠くへ
+		Goal = Vector3.new(0, -2, -25),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -25) },
 		Fans = {},
 		TutorialBlocks = {
-			-- 2つの坂で確実に加速させる
-			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) }, -- 1つ目
-			{ Type = "Wedge", Position = Vector3.new(0, 2, -4), Rotation = Vector3.new(0, 0, 0) }, -- 2つ目
+			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
+			{ Type = "Wedge", Position = Vector3.new(0, 2, -4), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
-	-- Stage 2: 90度反射 (壁を厚くする)
 	[2] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(20, -2, -20),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20), Vector3.new(20, 2, -20) },
 		Fans = {},
 		TutorialBlocks = {
-			-- 加速坂
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
-			-- 反射板 (2枚重ねて当たり判定を広くする)
 			{ Type = "Block", Position = Vector3.new(0, 2, -20), Rotation = Vector3.new(0, 45, 0) },
-			{ Type = "Block", Position = Vector3.new(-2, 2, -22), Rotation = Vector3.new(0, 45, 0) }, -- 裏打ち
+			{ Type = "Block", Position = Vector3.new(-2, 2, -22), Rotation = Vector3.new(0, 45, 0) },
 		},
 	},
-	-- Stage 3: 長距離坂道
 	[3] = {
 		Start = Vector3.new(0, 30, 20),
 		Goal = Vector3.new(0, -2, -30),
 		Waypoints = { Vector3.new(0, 30, 20), Vector3.new(0, 2, 20), Vector3.new(0, 2, 0), Vector3.new(0, 2, -30) },
 		Fans = {},
 		TutorialBlocks = {
-			-- ガイド通りに
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 20), Rotation = Vector3.new(0, 0, 0) },
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 16), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
-	-- Stage 4: 扇風機
 	[4] = {
 		Start = Vector3.new(0, 15, 30),
 		Goal = Vector3.new(0, -2, -30),
@@ -74,10 +65,9 @@ local STAGE_DATA = {
 		},
 		TutorialBlocks = {
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 30), Rotation = Vector3.new(0, 0, 0) },
-			{ Type = "Block", Position = Vector3.new(0, 2, 26), Rotation = Vector3.new(0, 0, 0) }, -- 足場延長
+			{ Type = "Block", Position = Vector3.new(0, 2, 26), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
-	-- Stage 5: 風×ジャンプ
 	[5] = {
 		Start = Vector3.new(-20, 15, 0),
 		Goal = Vector3.new(20, 10, 0),
@@ -91,8 +81,8 @@ local STAGE_DATA = {
 			},
 		},
 		TutorialBlocks = {
-			{ Type = "Wedge", Position = Vector3.new(-20, 2, 0), Rotation = Vector3.new(0, -90, 0) }, -- 右へ
-			{ Type = "Wedge", Position = Vector3.new(15, 2, 0), Rotation = Vector3.new(0, 90, 0) }, -- 上へ
+			{ Type = "Wedge", Position = Vector3.new(-20, 2, 0), Rotation = Vector3.new(0, -90, 0) },
+			{ Type = "Wedge", Position = Vector3.new(15, 2, 0), Rotation = Vector3.new(0, 90, 0) },
 		},
 	},
 }
@@ -251,6 +241,7 @@ local function createFloorWithGap(gapPosition, gapSize)
 	local FLOOR_THICKNESS = 4
 	local Y_POS = -2
 
+	-- ★修正: テクスチャの位置をワールド座標に合わせる
 	local function addGridTexture(part)
 		local texture = Instance.new("Texture")
 		texture.Face = Enum.NormalId.Top
@@ -259,6 +250,15 @@ local function createFloorWithGap(gapPosition, gapSize)
 		texture.Transparency = 0.8
 		texture.StudsPerTileU = 4
 		texture.StudsPerTileV = 4
+
+		-- パーツの角の座標を計算
+		local cornerX = part.Position.X - part.Size.X / 2
+		local cornerZ = part.Position.Z - part.Size.Z / 2
+
+		-- テクスチャのオフセットを調整して、ワールド座標(0,0)にグリッド線を合わせる
+		texture.OffsetStudsU = cornerX % 4
+		texture.OffsetStudsV = cornerZ % 4
+
 		texture.Parent = part
 	end
 
@@ -317,7 +317,6 @@ spawnBall = function()
 	ball.Position = currentStartPos
 	ball.Anchored = true
 	ball.CanCollide = true
-	-- ★修正: 摩擦(Friction)を下げて、止まりにくくする (0.3 -> 0.05)
 	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.05, 0.1)
 	ball.Parent = workspace
 	currentBall = ball
@@ -474,4 +473,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Larger Magnet & Easier Tutorial")
+print("GameManager Updated: Texture Alignment Fix")
