@@ -7,7 +7,6 @@ local Palette = require(Shared:WaitForChild("Palette"))
 local GameControlEvent = require(Events.GameControlEvent)
 
 -- 設定
--- ゴール自体の厚みは確保しつつ、スロープで登れるようにする
 local GOAL_POSITION = Vector3.new(0, 3, -20)
 local START_POSITION = Vector3.new(0, 15, 0)
 local BALL_SIZE = 4
@@ -28,6 +27,7 @@ local function spawnGoal()
 
 	local model = Instance.new("Model")
 	model.Name = "GoalModel"
+	model.Parent = workspace -- モデルを先にWorkspaceに置く
 
 	-- 1. 土台（ベース）
 	local basePart = Instance.new("Part")
@@ -37,18 +37,19 @@ local function spawnGoal()
 	basePart.Color = Palette.Entity.GoalBase
 	basePart.Material = Enum.Material.Grass
 	basePart.Anchored = true
+	basePart.Parent = workspace -- ★重要: 計算前にWorkspaceに置く
 
 	-- 2. 穴あけ用パーツ
 	local holeCutter = Instance.new("Part")
 	holeCutter.Name = "Cutter"
 	holeCutter.Shape = Enum.PartType.Cylinder
 	holeCutter.CFrame = basePart.CFrame * CFrame.Angles(0, 0, math.rad(90))
-	-- 確実に貫通させるため長さを少し余分にとる (10)
 	holeCutter.Size = Vector3.new(10, HOLE_SIZE, HOLE_SIZE)
+	holeCutter.Parent = workspace -- ★重要: 計算前にWorkspaceに置く
 
-	-- 3. CSG実行 (エラーハンドリング強化 & 設定変更)
+	-- 3. CSG実行
 	local success, result = pcall(function()
-		-- CollisionFidelityをDefaultに変更して成功率を上げる
+		-- CollisionFidelity.Default で安定化
 		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.Default)
 	end)
 
@@ -56,22 +57,21 @@ local function spawnGoal()
 		local unionGoal = result
 		unionGoal.Name = "GoalCup"
 		unionGoal.Anchored = true
-		unionGoal.Parent = model
+		unionGoal.Parent = model -- 完成品をモデルに入れる
 
-		-- 元パーツ破棄
+		-- 計算に使った元のパーツは破棄
 		basePart:Destroy()
 		holeCutter:Destroy()
 
-		-- ★追加: 視覚的なカップの底
+		-- ★カップの底（見た目）
 		local cupBottom = Instance.new("Part")
 		cupBottom.Name = "CupBottom"
 		cupBottom.Shape = Enum.PartType.Cylinder
 		cupBottom.Size = Vector3.new(0.2, HOLE_SIZE * 0.95, HOLE_SIZE * 0.95)
-		cupBottom.Color = Palette.Entity.GoalCup -- 暗い色
+		cupBottom.Color = Palette.Entity.GoalCup
 		cupBottom.Material = Enum.Material.Plastic
 		cupBottom.Anchored = true
 		cupBottom.CanCollide = true
-		-- ゴールの中央下部に配置
 		cupBottom.CFrame = unionGoal.CFrame * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(-GOAL_HEIGHT / 4, 0, 0)
 		cupBottom.Parent = model
 
@@ -115,9 +115,8 @@ local function spawnGoal()
 		flag.CFrame = pole.CFrame * CFrame.new(0, 4, -2)
 		flag.Parent = model
 
-		-- ★追加: 4方向のスロープ（坂）
-		-- これによりBaseplateからスムーズに登れるようにする
-		local rampLength = 12 -- 緩やかな坂にする
+		-- ★4方向のスロープ（坂）
+		local rampLength = 12
 		local directions = {
 			{ dir = Vector3.new(0, 0, 1), rot = 0 }, -- 手前
 			{ dir = Vector3.new(0, 0, -1), rot = 180 }, -- 奥
@@ -132,19 +131,19 @@ local function spawnGoal()
 			ramp.Color = Palette.Entity.GoalBase
 			ramp.Material = Enum.Material.Grass
 			ramp.Anchored = true
-			-- 位置合わせ: ゴール中心から、(幅半分 + 坂長さ半分) ずらす
+
 			local offset = (GOAL_WIDTH / 2 + rampLength / 2) * d.dir
-			-- 高さ合わせ: ゴール底面と同じ高さ（Y=0）に配置すると、Wedgeは中心基準なので調整が必要
-			-- Wedgeの高さH=6。中心はH/2=3。GOAL_POSITION.Yも3。高さは一致。
 			ramp.CFrame = CFrame.new(GOAL_POSITION + offset) * CFrame.Angles(0, math.rad(d.rot), 0)
 			ramp.Parent = model
 		end
 	else
-		warn("Failed to create goal geometry:", result) -- エラー詳細を表示
+		warn("Failed to create goal geometry:", result)
+		-- 失敗時は元のパーツをモデルに戻して表示しておく
 		basePart.Parent = model
+		if holeCutter then
+			holeCutter:Destroy()
+		end
 	end
-
-	model.Parent = workspace
 end
 
 -- ■ ボール生成
@@ -169,7 +168,6 @@ local function spawnBall()
 	return ball
 end
 
--- ゲーム開始
 local function startGame()
 	if currentBall then
 		currentBall.Anchored = false
@@ -182,18 +180,15 @@ local function startGame()
 	end
 end
 
--- ゲームリセット
 local function resetGame()
 	isGoalLocked = false
 	spawnBall()
 	print("Game Reset")
 end
 
--- 初期化
 spawnGoal()
 spawnBall()
 
--- イベント接続
 GameControlEvent.OnServerEvent:Connect(function(player, action)
 	if action == "start" then
 		startGame()
@@ -202,4 +197,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Goal Ramps and CSG Fix")
+print("GameManager Updated: CSG Fix (Parented to Workspace)")
