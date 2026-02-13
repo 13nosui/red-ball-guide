@@ -1,6 +1,6 @@
 -- src/Server/GameManager.server.luau
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService") -- アニメーション用
+local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Events = Shared:WaitForChild("Events")
 local Palette = require(Shared:WaitForChild("Palette"))
@@ -9,18 +9,33 @@ local GameControlEvent = require(Events.GameControlEvent)
 local UpdateStageEvent = require(Events.UpdateStageEvent)
 
 -- 設定
+-- Waypoints: ガイドパスの経由点リスト（スタートとゴールの間）
 local STAGE_DATA = {
 	[1] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(0, -2, -20),
+		Waypoints = {
+			Vector3.new(0, 10, -5),
+			Vector3.new(0, 5, -12),
+		},
 	},
 	[2] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(20, -2, -20),
+		Waypoints = {
+			Vector3.new(0, 10, -5),
+			Vector3.new(10, 5, -12),
+			Vector3.new(15, 2, -18),
+		},
 	},
 	[3] = {
 		Start = Vector3.new(-10, 20, 10),
 		Goal = Vector3.new(10, -2, -30),
+		Waypoints = {
+			Vector3.new(-5, 15, 0),
+			Vector3.new(0, 10, -10),
+			Vector3.new(5, 5, -20),
+		},
 	},
 }
 
@@ -28,9 +43,7 @@ local BALL_SIZE = 4
 local HOLE_SIZE = 5.5
 local GOAL_THICKNESS = 4
 local GOAL_WIDTH = 12
--- 吸い込み範囲（穴の大きさの1.5倍くらいの範囲に来たら吸い込む）
 local MAGNET_RADIUS = HOLE_SIZE * 1.5
--- 吸い込み有効速度（これ以上速いと吸い込まない＝飛び出し防止）
 local MAX_CAPTURE_SPEED = 40
 
 -- 状態
@@ -47,14 +60,13 @@ local startGame
 local loadStage
 local clearUserBlocks
 
--- ■ ゴール吸い込み演出（AI補正的な動き）
+-- ■ ゴール吸い込み
 local function captureBallIntoHole(ball, cupCenterPosition)
 	if isGoalLocked then
 		return
 	end
-	isGoalLocked = true -- 二重判定防止
+	isGoalLocked = true
 
-	-- 物理演算を停止して制御を奪う
 	ball.Anchored = true
 	ball.CanCollide = false
 	ball.AssemblyLinearVelocity = Vector3.zero
@@ -62,7 +74,6 @@ local function captureBallIntoHole(ball, cupCenterPosition)
 
 	print("✨ AI Assist: Capturing ball into goal...")
 
-	-- 1. カップの真上に移動（水平位置合わせ）
 	local overHolePos = Vector3.new(cupCenterPosition.X, ball.Position.Y, cupCenterPosition.Z)
 	local tween1 = TweenService:Create(ball, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		Position = overHolePos,
@@ -70,17 +81,14 @@ local function captureBallIntoHole(ball, cupCenterPosition)
 	tween1:Play()
 	tween1.Completed:Wait()
 
-	-- 2. カップの底に落とす（吸い込み）
-	local bottomPos = cupCenterPosition + Vector3.new(0, -2, 0) -- 少し沈める
+	local bottomPos = cupCenterPosition + Vector3.new(0, -2, 0)
 	local tween2 = TweenService:Create(ball, TweenInfo.new(0.4, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), {
 		Position = bottomPos,
 	})
 	tween2:Play()
 	tween2.Completed:Wait()
 
-	-- 3. ゴール確定
 	print("🎉 GOAL! Stage " .. currentStageIndex .. " Cleared!")
-
 	task.wait(1.5)
 
 	currentStageIndex = currentStageIndex + 1
@@ -219,7 +227,7 @@ spawnBall = function()
 	return ball
 end
 
--- ■ ゴール生成（マグネットセンサー追加）
+-- ■ ゴール生成
 local function spawnGoal()
 	local existingGoal = workspace:FindFirstChild("GoalModel")
 	if existingGoal then
@@ -230,10 +238,8 @@ local function spawnGoal()
 	model.Name = "GoalModel"
 	model.Parent = workspace
 
-	-- 床生成
 	createFloorWithGap(currentGoalPos, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
 
-	-- 土台
 	local basePart = Instance.new("Part")
 	basePart.Name = "Base"
 	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH)
@@ -243,7 +249,6 @@ local function spawnGoal()
 	basePart.Anchored = true
 	basePart.Parent = workspace
 
-	-- 穴あけ
 	local holeCutter = Instance.new("Part")
 	holeCutter.Name = "Cutter"
 	holeCutter.Shape = Enum.PartType.Cylinder
@@ -264,7 +269,6 @@ local function spawnGoal()
 		basePart:Destroy()
 		holeCutter:Destroy()
 
-		-- カップ底
 		local cupBottom = Instance.new("Part")
 		cupBottom.Name = "CupBottom"
 		cupBottom.Shape = Enum.PartType.Cylinder
@@ -278,13 +282,10 @@ local function spawnGoal()
 			* CFrame.new(-GOAL_THICKNESS / 2 + 0.2, 0, 0)
 		cupBottom.Parent = model
 
-		-- ★マグネットセンサー（ゴールアシスト領域）
-		-- 穴よりも一回り大きい透明な判定エリアを作る
 		local magnet = Instance.new("Part")
 		magnet.Name = "MagnetSensor"
 		magnet.Shape = Enum.PartType.Cylinder
-		magnet.Size = Vector3.new(1, MAGNET_RADIUS, MAGNET_RADIUS) -- 厚さ1, 半径大きめ
-		-- 穴の少し上(Y=0.5付近)に配置してボールを待ち受ける
+		magnet.Size = Vector3.new(1, MAGNET_RADIUS, MAGNET_RADIUS)
 		magnet.CFrame = unionGoal.CFrame * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(1, 0, 0)
 		magnet.Transparency = 1
 		magnet.CanCollide = false
@@ -294,21 +295,16 @@ local function spawnGoal()
 		magnet.Touched:Connect(function(hit)
 			if isGoalLocked then
 				return
-			end -- 既にゴール処理中なら無視
-
+			end
 			if hit.Name == "RedBall" then
 				local velocity = hit.AssemblyLinearVelocity.Magnitude
-
-				-- 「速度が適切（速すぎない）」かつ「まだゴール処理していない」場合
 				if velocity < MAX_CAPTURE_SPEED then
-					-- ゴールの中心座標（Baseplate表面の高さ）
 					local goalCenter = Vector3.new(currentGoalPos.X, 0, currentGoalPos.Z)
 					captureBallIntoHole(hit, goalCenter)
 				end
 			end
 		end)
 
-		-- ポールと旗
 		local pole = Instance.new("Part")
 		pole.Name = "Pole"
 		pole.Size = Vector3.new(0.4, 12, 0.4)
@@ -350,7 +346,9 @@ loadStage = function(index)
 		clearUserBlocks()
 		spawnGoal()
 		spawnBall()
-		UpdateStageEvent:FireAllClients(index)
+
+		-- ステージ番号とデータをクライアントに送信
+		UpdateStageEvent:FireAllClients(index, data)
 	end
 end
 
@@ -385,4 +383,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: AI Assist (Magnet) Implemented")
+print("GameManager Updated: Waypoints Added to Stage Data")
