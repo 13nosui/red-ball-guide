@@ -7,10 +7,13 @@ local Palette = require(Shared:WaitForChild("Palette"))
 local GameControlEvent = require(Events.GameControlEvent)
 
 -- 設定
+-- ゴール自体の厚みは確保しつつ、スロープで登れるようにする
 local GOAL_POSITION = Vector3.new(0, 3, -20)
 local START_POSITION = Vector3.new(0, 15, 0)
 local BALL_SIZE = 4
 local HOLE_SIZE = 5.5
+local GOAL_HEIGHT = 6
+local GOAL_WIDTH = 12
 
 -- 状態
 local currentBall = nil
@@ -29,7 +32,7 @@ local function spawnGoal()
 	-- 1. 土台（ベース）
 	local basePart = Instance.new("Part")
 	basePart.Name = "Base"
-	basePart.Size = Vector3.new(12, 6, 12)
+	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_HEIGHT, GOAL_WIDTH)
 	basePart.CFrame = CFrame.new(GOAL_POSITION)
 	basePart.Color = Palette.Entity.GoalBase
 	basePart.Material = Enum.Material.Grass
@@ -40,18 +43,22 @@ local function spawnGoal()
 	holeCutter.Name = "Cutter"
 	holeCutter.Shape = Enum.PartType.Cylinder
 	holeCutter.CFrame = basePart.CFrame * CFrame.Angles(0, 0, math.rad(90))
-	holeCutter.Size = Vector3.new(8, HOLE_SIZE, HOLE_SIZE)
+	-- 確実に貫通させるため長さを少し余分にとる (10)
+	holeCutter.Size = Vector3.new(10, HOLE_SIZE, HOLE_SIZE)
 
-	-- 3. CSG実行
-	local success, unionGoal = pcall(function()
-		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.PreciseConvexDecomposition)
+	-- 3. CSG実行 (エラーハンドリング強化 & 設定変更)
+	local success, result = pcall(function()
+		-- CollisionFidelityをDefaultに変更して成功率を上げる
+		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.Default)
 	end)
 
-	if success and unionGoal then
+	if success and result then
+		local unionGoal = result
 		unionGoal.Name = "GoalCup"
 		unionGoal.Anchored = true
 		unionGoal.Parent = model
 
+		-- 元パーツ破棄
 		basePart:Destroy()
 		holeCutter:Destroy()
 
@@ -59,21 +66,20 @@ local function spawnGoal()
 		local cupBottom = Instance.new("Part")
 		cupBottom.Name = "CupBottom"
 		cupBottom.Shape = Enum.PartType.Cylinder
-		cupBottom.Size = Vector3.new(0.2, HOLE_SIZE * 0.95, HOLE_SIZE * 0.95) -- 薄い円柱
+		cupBottom.Size = Vector3.new(0.2, HOLE_SIZE * 0.95, HOLE_SIZE * 0.95)
 		cupBottom.Color = Palette.Entity.GoalCup -- 暗い色
 		cupBottom.Material = Enum.Material.Plastic
 		cupBottom.Anchored = true
-		cupBottom.CanCollide = true -- ボールが乗るように
-		-- ゴールの中央下部に配置 (高さ3の半分である-1.5の位置)
-		cupBottom.CFrame = unionGoal.CFrame * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(-1.5, 0, 0)
+		cupBottom.CanCollide = true
+		-- ゴールの中央下部に配置
+		cupBottom.CFrame = unionGoal.CFrame * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(-GOAL_HEIGHT / 4, 0, 0)
 		cupBottom.Parent = model
 
-		-- 4. 判定センサー（カップ底の少し上）
+		-- 4. 判定センサー
 		local sensor = Instance.new("Part")
 		sensor.Name = "WinSensor"
 		sensor.Size = Vector3.new(0.5, HOLE_SIZE * 0.8, HOLE_SIZE * 0.8)
 		sensor.Shape = Enum.PartType.Cylinder
-		-- カップ底の少し上に配置
 		sensor.CFrame = cupBottom.CFrame * CFrame.new(0.5, 0, 0)
 		sensor.Transparency = 1
 		sensor.CanCollide = false
@@ -108,8 +114,33 @@ local function spawnGoal()
 		flag.CanCollide = false
 		flag.CFrame = pole.CFrame * CFrame.new(0, 4, -2)
 		flag.Parent = model
+
+		-- ★追加: 4方向のスロープ（坂）
+		-- これによりBaseplateからスムーズに登れるようにする
+		local rampLength = 12 -- 緩やかな坂にする
+		local directions = {
+			{ dir = Vector3.new(0, 0, 1), rot = 0 }, -- 手前
+			{ dir = Vector3.new(0, 0, -1), rot = 180 }, -- 奥
+			{ dir = Vector3.new(-1, 0, 0), rot = -90 }, -- 左
+			{ dir = Vector3.new(1, 0, 0), rot = 90 }, -- 右
+		}
+
+		for _, d in ipairs(directions) do
+			local ramp = Instance.new("WedgePart")
+			ramp.Name = "GoalRamp"
+			ramp.Size = Vector3.new(GOAL_WIDTH, GOAL_HEIGHT, rampLength)
+			ramp.Color = Palette.Entity.GoalBase
+			ramp.Material = Enum.Material.Grass
+			ramp.Anchored = true
+			-- 位置合わせ: ゴール中心から、(幅半分 + 坂長さ半分) ずらす
+			local offset = (GOAL_WIDTH / 2 + rampLength / 2) * d.dir
+			-- 高さ合わせ: ゴール底面と同じ高さ（Y=0）に配置すると、Wedgeは中心基準なので調整が必要
+			-- Wedgeの高さH=6。中心はH/2=3。GOAL_POSITION.Yも3。高さは一致。
+			ramp.CFrame = CFrame.new(GOAL_POSITION + offset) * CFrame.Angles(0, math.rad(d.rot), 0)
+			ramp.Parent = model
+		end
 	else
-		warn("Failed to create goal geometry")
+		warn("Failed to create goal geometry:", result) -- エラー詳細を表示
 		basePart.Parent = model
 	end
 
@@ -171,4 +202,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Goal Cup Visual Added")
+print("GameManager Updated: Goal Ramps and CSG Fix")
