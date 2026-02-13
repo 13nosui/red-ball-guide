@@ -7,8 +7,6 @@ local Palette = require(Shared:WaitForChild("Palette"))
 local GameControlEvent = require(Events.GameControlEvent)
 
 -- 設定
--- ゴールの表面をY=0（Baseplateと同じ）にするための設定
--- Baseplate(厚さ4, Y=-2)に合わせて、ゴールも厚さ4, Y=-2に設定して埋め込む
 local GOAL_POSITION = Vector3.new(0, -2, -20)
 local START_POSITION = Vector3.new(0, 15, 0)
 local BALL_SIZE = 4
@@ -20,14 +18,13 @@ local GOAL_WIDTH = 12
 local currentBall = nil
 local isGoalLocked = false
 
--- ■ Baseplateの加工処理（ゴール部分をくり抜く）
+-- ■ Baseplateの加工処理
 local function cutBaseplateForGoal(targetCFrame, size)
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if not baseplate then
 		return
 	end
 
-	-- 既に加工済み（Union）なら再加工しない（エラー防止）
 	if baseplate:IsA("UnionOperation") and baseplate.Name == "BaseplateWithHole" then
 		return
 	end
@@ -36,23 +33,22 @@ local function cutBaseplateForGoal(targetCFrame, size)
 
 	local cutter = Instance.new("Part")
 	cutter.Name = "BaseplateCutter"
-	cutter.Size = Vector3.new(size.X, 20, size.Z) -- 確実に貫通させるため高さを盛る
+	cutter.Size = Vector3.new(size.X, 20, size.Z)
 	cutter.CFrame = targetCFrame
 	cutter.Anchored = true
 	cutter.Parent = workspace
 
 	local success, result = pcall(function()
-		return baseplate:SubtractAsync({ cutter }, Enum.CollisionFidelity.Default)
+		-- ★修正1: Baseplateの穴も精密に計算する
+		return baseplate:SubtractAsync({ cutter }, Enum.CollisionFidelity.PreciseConvexDecomposition)
 	end)
 
 	if success and result then
-		-- 元のBaseplateのプロパティを引き継ぐ
-		result.Name = "BaseplateWithHole" -- 名前を変えて再加工防止
+		result.Name = "BaseplateWithHole"
 		result.Anchored = true
 		result.CanCollide = true
 		result.Parent = workspace
 
-		-- テクスチャがあれば移植する
 		for _, child in pairs(baseplate:GetChildren()) do
 			if child:IsA("Texture") then
 				child.Parent = result
@@ -78,11 +74,10 @@ local function spawnGoal()
 	model.Name = "GoalModel"
 	model.Parent = workspace
 
-	-- 0. Baseplateに穴を空ける（場所を作る）
-	-- ゴールブロックと同じサイズ・位置でBaseplateをくり抜く
+	-- 0. Baseplateに穴を空ける
 	cutBaseplateForGoal(CFrame.new(GOAL_POSITION), Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
 
-	-- 1. ゴールの土台（芝生部分）
+	-- 1. ゴールの土台
 	local basePart = Instance.new("Part")
 	basePart.Name = "Base"
 	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH)
@@ -90,9 +85,9 @@ local function spawnGoal()
 	basePart.Color = Palette.Entity.GoalBase
 	basePart.Material = Enum.Material.Grass
 	basePart.Anchored = true
-	basePart.Parent = workspace -- CSG用に一時配置
+	basePart.Parent = workspace
 
-	-- 2. カップの穴あけ用パーツ
+	-- 2. 穴あけ用パーツ
 	local holeCutter = Instance.new("Part")
 	holeCutter.Name = "Cutter"
 	holeCutter.Shape = Enum.PartType.Cylinder
@@ -100,9 +95,10 @@ local function spawnGoal()
 	holeCutter.Size = Vector3.new(GOAL_THICKNESS * 2, HOLE_SIZE, HOLE_SIZE)
 	holeCutter.Parent = workspace
 
-	-- 3. CSG実行（芝生ブロックに穴を空ける）
+	-- 3. CSG実行
 	local success, result = pcall(function()
-		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.Default)
+		-- ★修正2: ゴールの穴を精密に計算する (ここが重要)
+		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.PreciseConvexDecomposition)
 	end)
 
 	if success and result then
@@ -114,7 +110,7 @@ local function spawnGoal()
 		basePart:Destroy()
 		holeCutter:Destroy()
 
-		-- 4. カップの底（見た目）
+		-- 4. カップの底
 		local cupBottom = Instance.new("Part")
 		cupBottom.Name = "CupBottom"
 		cupBottom.Shape = Enum.PartType.Cylinder
@@ -123,7 +119,6 @@ local function spawnGoal()
 		cupBottom.Material = Enum.Material.Plastic
 		cupBottom.Anchored = true
 		cupBottom.CanCollide = true
-		-- 底の位置調整
 		cupBottom.CFrame = unionGoal.CFrame
 			* CFrame.Angles(0, 0, math.rad(90))
 			* CFrame.new(-GOAL_THICKNESS / 2 + 0.2, 0, 0)
@@ -157,7 +152,6 @@ local function spawnGoal()
 		pole.Color = Palette.Entity.GoalPole
 		pole.Anchored = true
 		pole.CanCollide = false
-		-- 位置調整（表面Y=0から生やす）
 		pole.CFrame = CFrame.new(GOAL_POSITION.X, 0 + 6, GOAL_POSITION.Z - 4)
 		pole.Parent = model
 
@@ -218,7 +212,6 @@ local function resetGame()
 	print("Game Reset")
 end
 
--- Baseplateの生成を待つ（EnvironmentSetupの実行待ち）
 task.wait(1)
 spawnGoal()
 spawnBall()
@@ -231,4 +224,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Flush Goal (Embedded in Baseplate)")
+print("GameManager Updated: Precise Collision for Goal Hole")
