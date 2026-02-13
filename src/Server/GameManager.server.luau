@@ -5,25 +5,57 @@ local Events = Shared:WaitForChild("Events")
 local Palette = require(Shared:WaitForChild("Palette"))
 
 local GameControlEvent = require(Events.GameControlEvent)
+-- 新しいイベントを追加
+local UpdateStageEvent = require(Events.UpdateStageEvent)
 
--- 設定
-local GOAL_POSITION = Vector3.new(0, -2, -20)
-local START_POSITION = Vector3.new(0, 15, 0)
+-- ■ ステージデータ定義
+-- ここに各ステージの構成を記述します
+local STAGE_DATA = {
+	[1] = {
+		Start = Vector3.new(0, 15, 0),
+		Goal = Vector3.new(0, -2, -20),
+	},
+	[2] = {
+		Start = Vector3.new(0, 15, 0),
+		Goal = Vector3.new(20, -2, -20), -- 右奥へ
+	},
+	[3] = {
+		Start = Vector3.new(-10, 20, 10),
+		Goal = Vector3.new(10, -2, -30), -- 高低差と距離
+	},
+}
+
+-- 設定定数
 local BALL_SIZE = 4
 local HOLE_SIZE = 5.5
 local GOAL_THICKNESS = 4
 local GOAL_WIDTH = 12
 
--- 状態
+-- 状態変数
+local currentStageIndex = 1
 local currentBall = nil
 local isGoalLocked = false
 
--- 前方宣言 (これにより、どの関数からでも呼び出せるようになります)
+-- 現在のステージ設定（初期値はステージ1）
+local currentStartPos = STAGE_DATA[1].Start
+local currentGoalPos = STAGE_DATA[1].Goal
+
+-- 前方宣言
 local spawnBall
 local resetGame
 local startGame
+local loadStage
+local clearUserBlocks
 
--- ■ 1. 地面生成関数
+-- ■ 1. ユーザーが配置したブロックを消去する関数
+clearUserBlocks = function()
+	local folder = workspace:FindFirstChild("PlacedBlocks")
+	if folder then
+		folder:ClearAllChildren()
+	end
+end
+
+-- ■ 2. 地面生成関数（穴の位置を動的に変更）
 local function createFloorWithGap(gapPosition, gapSize)
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if baseplate then
@@ -57,7 +89,7 @@ local function createFloorWithGap(gapPosition, gapSize)
 	local gx, gz = gapPosition.X, gapPosition.Z
 	local gw, gd = gapSize.X, gapSize.Z
 
-	-- 1. 北側
+	-- 北側
 	local northSizeZ = (WORLD_SIZE / 2) - (math.abs(gz) + gd / 2)
 	local northPosZ = (gz - gd / 2) - northSizeZ / 2
 	if northSizeZ > 0 then
@@ -72,12 +104,11 @@ local function createFloorWithGap(gapPosition, gapSize)
 		p.Parent = floorModel
 	end
 
-	-- 2. 南側
+	-- 南側
 	local southStart = gz + gd / 2
 	local southEnd = WORLD_SIZE / 2
 	local sSizeZ = southEnd - southStart
 	local sPosZ = southStart + sSizeZ / 2
-
 	local pSouth = Instance.new("Part")
 	pSouth.Name = "FloorSouth"
 	pSouth.Size = Vector3.new(WORLD_SIZE, FLOOR_THICKNESS, sSizeZ)
@@ -88,12 +119,11 @@ local function createFloorWithGap(gapPosition, gapSize)
 	addGridTexture(pSouth)
 	pSouth.Parent = floorModel
 
-	-- 3. 西側
+	-- 西側
 	local westStart = -WORLD_SIZE / 2
 	local westEnd = gx - gw / 2
 	local wSizeX = westEnd - westStart
 	local wPosX = westStart + wSizeX / 2
-
 	local pWest = Instance.new("Part")
 	pWest.Name = "FloorWest"
 	pWest.Size = Vector3.new(wSizeX, FLOOR_THICKNESS, gd)
@@ -104,12 +134,11 @@ local function createFloorWithGap(gapPosition, gapSize)
 	addGridTexture(pWest)
 	pWest.Parent = floorModel
 
-	-- 4. 東側
+	-- 東側
 	local eastStart = gx + gw / 2
 	local eastEnd = WORLD_SIZE / 2
 	local eSizeX = eastEnd - eastStart
 	local ePosX = eastStart + eSizeX / 2
-
 	local pEast = Instance.new("Part")
 	pEast.Name = "FloorEast"
 	pEast.Size = Vector3.new(eSizeX, FLOOR_THICKNESS, gd)
@@ -123,7 +152,7 @@ local function createFloorWithGap(gapPosition, gapSize)
 	floorModel.Parent = workspace
 end
 
--- ■ 2. ボール生成関数
+-- ■ 3. ボール生成
 spawnBall = function()
 	if currentBall then
 		currentBall:Destroy()
@@ -135,7 +164,7 @@ spawnBall = function()
 	ball.Size = Vector3.new(BALL_SIZE, BALL_SIZE, BALL_SIZE)
 	ball.Color = Palette.Entity.Ball
 	ball.Material = Enum.Material.Plastic
-	ball.Position = START_POSITION
+	ball.Position = currentStartPos -- 現在のステージ設定を使用
 	ball.Anchored = true
 	ball.CanCollide = true
 	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.1)
@@ -145,27 +174,7 @@ spawnBall = function()
 	return ball
 end
 
--- ■ 3. ゲーム開始関数
-startGame = function()
-	if currentBall then
-		currentBall.Anchored = false
-		isGoalLocked = false
-		print("Game Started")
-	else
-		spawnBall()
-		currentBall.Anchored = false
-		isGoalLocked = false
-	end
-end
-
--- ■ 4. リセット関数
-resetGame = function()
-	isGoalLocked = false
-	spawnBall()
-	print("Game Reset")
-end
-
--- ■ 5. ゴール生成関数 (resetGameを使用するため最後に定義)
+-- ■ 4. ゴール生成
 local function spawnGoal()
 	local existingGoal = workspace:FindFirstChild("GoalModel")
 	if existingGoal then
@@ -176,20 +185,19 @@ local function spawnGoal()
 	model.Name = "GoalModel"
 	model.Parent = workspace
 
-	-- 床の再生成（穴あけ）
-	createFloorWithGap(GOAL_POSITION, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
+	-- 床の再生成（現在のゴール位置に合わせて穴を開ける）
+	createFloorWithGap(currentGoalPos, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
 
 	-- ゴール土台
 	local basePart = Instance.new("Part")
 	basePart.Name = "Base"
 	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH)
-	basePart.CFrame = CFrame.new(GOAL_POSITION)
+	basePart.CFrame = CFrame.new(currentGoalPos)
 	basePart.Color = Palette.Entity.GoalBase
 	basePart.Material = Enum.Material.Grass
 	basePart.Anchored = true
 	basePart.Parent = workspace
 
-	-- 穴あけ用パーツ
 	local holeCutter = Instance.new("Part")
 	holeCutter.Name = "Cutter"
 	holeCutter.Shape = Enum.PartType.Cylinder
@@ -197,7 +205,6 @@ local function spawnGoal()
 	holeCutter.Size = Vector3.new(GOAL_THICKNESS * 2, HOLE_SIZE, HOLE_SIZE)
 	holeCutter.Parent = workspace
 
-	-- CSG実行
 	local success, result = pcall(function()
 		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.PreciseConvexDecomposition)
 	end)
@@ -239,10 +246,19 @@ local function spawnGoal()
 		sensor.Touched:Connect(function(hit)
 			if hit.Name == "RedBall" and not isGoalLocked then
 				isGoalLocked = true
-				print("🎉 GOAL! Stage Cleared!")
-				task.wait(1.5)
-				-- ★ここで resetGame を呼ぶため、この時点で resetGame が定義されている必要がある
-				resetGame()
+				print("🎉 GOAL! Stage " .. currentStageIndex .. " Cleared!")
+
+				-- 少し待ってから次のステージへ
+				task.wait(2)
+
+				-- ステージを進める
+				currentStageIndex = currentStageIndex + 1
+				if currentStageIndex > #STAGE_DATA then
+					currentStageIndex = 1 -- 最後まで行ったら最初に戻る（ループ）
+					print("All stages cleared! Loop back to 1.")
+				end
+
+				loadStage(currentStageIndex)
 			end
 		end)
 
@@ -254,7 +270,7 @@ local function spawnGoal()
 		pole.Color = Palette.Entity.GoalPole
 		pole.Anchored = true
 		pole.CanCollide = false
-		pole.CFrame = CFrame.new(GOAL_POSITION.X, 0 + 6, GOAL_POSITION.Z - 4)
+		pole.CFrame = CFrame.new(currentGoalPos.X, 0 + 6, currentGoalPos.Z - 4)
 		pole.Parent = model
 
 		local flag = Instance.new("Part")
@@ -274,10 +290,55 @@ local function spawnGoal()
 	end
 end
 
--- 初期化実行
+-- ■ 5. ステージロード関数
+loadStage = function(index)
+	isGoalLocked = false
+	currentStageIndex = index
+
+	local data = STAGE_DATA[index]
+	if data then
+		currentStartPos = data.Start
+		currentGoalPos = data.Goal
+
+		print("Loading Stage " .. index)
+
+		-- ユーザーのブロックを消す（新しいパズルにするため）
+		clearUserBlocks()
+
+		-- ゴールとボールを再配置
+		spawnGoal()
+		spawnBall()
+
+		-- クライアントにステージ番号更新を通知
+		UpdateStageEvent:FireAllClients(index)
+	end
+end
+
+-- ■ 6. ゲームフロー制御
+startGame = function()
+	if currentBall then
+		currentBall.Anchored = false
+		isGoalLocked = false
+		print("Game Started")
+	else
+		spawnBall()
+		currentBall.Anchored = false
+		isGoalLocked = false
+	end
+end
+
+resetGame = function()
+	-- リセット時は現在のステージを再ロードする（ブロックは消さない方が親切かもしれないが、今回は配置を戻す）
+	-- ※ 仕様書では「配置したブロックはそのまま維持」とあるので、loadStageではなくspawnBallのみ行うのが正しい
+
+	isGoalLocked = false
+	spawnBall() -- ボールだけ戻す
+	print("Game Reset (Ball only)")
+end
+
+-- 初期化
 task.wait(1)
-spawnGoal()
-spawnBall()
+loadStage(1) -- 最初はステージ1をロード
 
 GameControlEvent.OnServerEvent:Connect(function(player, action)
 	if action == "start" then
@@ -287,4 +348,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Fixed Function Ordering")
+print("GameManager Updated: Stage Progression System Implemented")
