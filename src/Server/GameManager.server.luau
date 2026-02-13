@@ -1,19 +1,14 @@
 -- src/Server/GameManager.server.luau
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Events = Shared:WaitForChild("Events")
 local Palette = require(Shared:WaitForChild("Palette"))
 
--- イベント取得（なければ待機）
-local GameControlEvent = ReplicatedStorage:WaitForChild("GameControlEvent", 10)
-if not GameControlEvent then
-	-- イベントファイルがまだ読み込まれていない場合のフォールバック（通常はModule経由で生成されるため不要だが安全策）
-	GameControlEvent = Instance.new("RemoteEvent")
-	GameControlEvent.Name = "GameControlEvent"
-	GameControlEvent.Parent = ReplicatedStorage
-end
+-- 修正点1: WaitForChildではなく、モジュールを直接requireしてイベントを即座に確保する
+local GameControlEvent = require(Events.GameControlEvent)
 
 -- 設定
-local START_POSITION = Vector3.new(0, 15, 0) -- 開始位置（高さ15）
+local START_POSITION = Vector3.new(0, 15, 0)
 local BALL_SIZE = 4
 
 -- ボールの参照
@@ -32,34 +27,35 @@ local function spawnBall()
 	ball.Color = Palette.Entity.Ball
 	ball.Material = Enum.Material.Plastic
 	ball.Position = START_POSITION
-	ball.Anchored = true -- 初期状態は固定
+	ball.Anchored = true
 	ball.CanCollide = true
-	ball.Restitution = 0.8 -- 少し弾む
+
+	-- 修正点2: RestitutionではなくCustomPhysicalPropertiesを使用する
+	-- PhysicalProperties.new(Density, Friction, Elasticity)
+	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.8)
+
 	ball.Parent = workspace
 
 	currentBall = ball
 	return ball
 end
 
--- ゲーム開始（物理演算有効化）
+-- ゲーム開始
 local function startGame()
 	if currentBall then
 		currentBall.Anchored = false
 		print("Game Started: Ball physics enabled")
+	else
+		-- ボールがない場合は生成してからスタート
+		spawnBall()
+		currentBall.Anchored = false
 	end
 end
 
--- ゲームリセット（位置戻し・固定）
+-- ゲームリセット
 local function resetGame()
-	if currentBall then
-		currentBall.Anchored = true
-		currentBall.Position = START_POSITION
-		currentBall.AssemblyLinearVelocity = Vector3.zero
-		currentBall.AssemblyAngularVelocity = Vector3.zero
-		print("Game Reset: Ball returned to start")
-	else
-		spawnBall()
-	end
+	spawnBall() -- 作り直して初期位置へ
+	print("Game Reset: Ball returned to start")
 end
 
 -- 初期化
@@ -74,4 +70,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Initialized")
+print("GameManager Initialized (Fixed)")
