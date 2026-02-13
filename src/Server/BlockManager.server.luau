@@ -61,20 +61,26 @@ end)
 -- 更新イベント（移動・回転・削除）
 UpdateBlockEvent.OnServerEvent:Connect(function(player, block, action, value)
 	if block and block.Parent and block.Name == "PlacedBlock_" .. player.Name then
-		-- 共通Tween設定
 		local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 		if action == "rotate" then
-			-- 回転処理
 			local rotationCFrame = CFrame.Angles(math.rad(value.X), math.rad(value.Y), math.rad(value.Z))
 			local targetCFrame = block.CFrame * rotationCFrame
 			TweenService:Create(block, tweenInfo, { CFrame = targetCFrame }):Play()
 		elseif action == "move" then
-			-- 移動処理 (valueは移動量のVector3)
+			-- 相対移動（ボタン操作用: Up/Downで使用）
 			local targetPosition = block.Position + value
-			-- 衝突判定や範囲制限が必要ならここで追加
-			if targetPosition.Y >= 2 then -- 地面より下にいかない簡易チェック
+			if targetPosition.Y >= 0 then
 				TweenService:Create(block, tweenInfo, { Position = targetPosition }):Play()
+			end
+		elseif action == "moveTo" then
+			-- ★追加: 絶対座標移動（ドラッグ＆ドロップ用）
+			local targetPosition = value
+			-- 地面(Y=0付近)より下にいかないようにする
+			if targetPosition.Y >= -2 then
+				-- Tweenを使わず即時反映（ドラッグ操作の追従性重視）
+				-- あるいは非常に短いTweenで滑らかにする
+				TweenService:Create(block, TweenInfo.new(0.1), { Position = targetPosition }):Play()
 			end
 		elseif action == "delete" then
 			block:Destroy()
@@ -82,4 +88,4 @@ UpdateBlockEvent.OnServerEvent:Connect(function(player, block, action, value)
 	end
 end)
 
-print("BlockManager with Move Action Updated")
+print("BlockManager: Added moveTo action")

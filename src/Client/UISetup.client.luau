@@ -129,7 +129,8 @@ local btnWedge = create3DButton("ButtonWedge", "Wedge", drawerFrame)
 -- 2. 操作パネル
 local controlPanel = Instance.new("Frame")
 controlPanel.Name = "ControlPanel"
-controlPanel.Size = UDim2.new(0, 620, 0, 80)
+-- ボタンが減ったので幅を縮小 (620 -> 380)
+controlPanel.Size = UDim2.new(0, 380, 0, 80)
 controlPanel.AnchorPoint = Vector2.new(0.5, 1)
 controlPanel.Position = UDim2.new(0.5, 0, 0.95, 0)
 controlPanel.Parent = editFrame
@@ -161,18 +162,16 @@ local function createTextButton(name, text, parent, color, size, layoutOrder)
 end
 
 local moveColor = Palette.System.Move
-local btnBackward = createTextButton("ButtonBackward", "↓", controlPanel, moveColor, nil, 1)
-local btnForward = createTextButton("ButtonForward", "↑", controlPanel, moveColor, nil, 2)
-local btnLeft = createTextButton("ButtonLeft", "←", controlPanel, moveColor, nil, 3)
-local btnRight = createTextButton("ButtonRight", "→", controlPanel, moveColor, nil, 4)
-local btnDown = createTextButton("ButtonDown", "Down", controlPanel, moveColor, nil, 5)
-local btnUp = createTextButton("ButtonUp", "Up", controlPanel, moveColor, nil, 6)
+-- 矢印ボタンを削除し、高さ調整と回転のみ残す
+local btnDown = createTextButton("ButtonDown", "Down", controlPanel, moveColor, nil, 1)
+local btnUp = createTextButton("ButtonUp", "Up", controlPanel, moveColor, nil, 2)
+
 local btnRotX =
-	createTextButton("ButtonRotateX", "Rot X", controlPanel, Color3.fromRGB(255, 80, 80), UDim2.new(0, 60, 0, 50), 7)
+	createTextButton("ButtonRotateX", "Rot X", controlPanel, Color3.fromRGB(255, 80, 80), UDim2.new(0, 60, 0, 50), 3)
 local btnRotY =
-	createTextButton("ButtonRotateY", "Rot Y", controlPanel, Color3.fromRGB(80, 255, 80), UDim2.new(0, 60, 0, 50), 8)
+	createTextButton("ButtonRotateY", "Rot Y", controlPanel, Color3.fromRGB(80, 255, 80), UDim2.new(0, 60, 0, 50), 4)
 local btnRotZ =
-	createTextButton("ButtonRotateZ", "Rot Z", controlPanel, Color3.fromRGB(80, 80, 255), UDim2.new(0, 60, 0, 50), 9)
+	createTextButton("ButtonRotateZ", "Rot Z", controlPanel, Color3.fromRGB(80, 80, 255), UDim2.new(0, 60, 0, 50), 5)
 
 -- 3. ヘッダー
 local headerFrame = Instance.new("Frame")
@@ -187,7 +186,6 @@ local stageLabel = Instance.new("TextLabel")
 stageLabel.Name = "StageLabel"
 stageLabel.Size = UDim2.new(1, 0, 1, 0)
 stageLabel.BackgroundTransparency = 1
--- ★修正: 大文字のSTAGE
 stageLabel.Text = "STAGE: 01"
 stageLabel.TextColor3 = Color3.new(1, 1, 1)
 stageLabel.Font = Enum.Font.GothamBold
@@ -213,4 +211,4 @@ actionLayout.Parent = actionPanel
 local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
 local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
 
-print("UI Setup: Text Updated to STAGE")
+print("UI Setup: Removed Arrow Buttons for Drag & Drop")
