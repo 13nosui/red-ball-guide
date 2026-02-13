@@ -15,6 +15,7 @@ local tutorialFolder = workspace:FindFirstChild("TutorialGhosts") or Instance.ne
 tutorialFolder.Name = "TutorialGhosts"
 tutorialFolder.Parent = workspace
 
+-- 点線描画 (変更なし)
 local function createDottedLine(startPos, endPos)
 	local distance = (endPos - startPos).Magnitude
 	local direction = (endPos - startPos).Unit
@@ -56,6 +57,7 @@ local function drawGuidePath(stageData)
 	print("VisualEffectController: Guide Path Drawn")
 end
 
+-- ★チュートリアルゴースト描画 (色と透明度を修正)
 local function drawTutorialGhosts(stageData)
 	tutorialFolder:ClearAllChildren()
 
@@ -85,16 +87,17 @@ local function drawTutorialGhosts(stageData)
 
 		if part then
 			part.Size = Vector3.new(4, 4, 4)
-			part.Material = Enum.Material.ForceField
+			part.Material = Enum.Material.ForceField -- ホログラム感は維持
 
-			-- ★修正: Paletteがnilでもエラーにならないようにする
-			if Palette.System and Palette.System.TutorialGhost then
-				part.Color = Palette.System.TutorialGhost
+			-- ★修正1: 本来のブロックの色を使用する
+			if Palette.BlockColors and Palette.BlockColors[bType] then
+				part.Color = Palette.BlockColors[bType]
 			else
-				part.Color = Color3.new(1, 1, 0) -- 黄色 (Fallback)
+				part.Color = Color3.new(0.8, 0.8, 0.8) -- フォールバック
 			end
 
-			part.Transparency = 0.6
+			-- ★修正2: 透明度を下げて濃くする (0.6 -> 0.3)
+			part.Transparency = 0.3
 			part.Anchored = true
 			part.CanCollide = false
 			part.CastShadow = false
@@ -103,22 +106,24 @@ local function drawTutorialGhosts(stageData)
 			part.CFrame = CFrame.new(blockInfo.Position)
 				* CFrame.Angles(math.rad(rot.X), math.rad(rot.Y), math.rad(rot.Z))
 
+			-- ハイライト枠線 (白で強調)
 			local highlight = Instance.new("Highlight")
 			highlight.FillColor = part.Color
 			highlight.OutlineColor = Color3.new(1, 1, 1)
-			highlight.FillTransparency = 0.8
+			highlight.FillTransparency = 0.5 -- 塗りつぶしも少し濃く
 			highlight.OutlineTransparency = 0
 			highlight.Parent = part
 
+			-- 点滅アニメーション (範囲を狭めて常に見えやすく: 0.2 <-> 0.5)
 			local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-			TweenService:Create(part, tweenInfo, { Transparency = 0.3 }):Play()
+			TweenService:Create(part, tweenInfo, { Transparency = 0.5 }):Play()
 
 			part.Parent = tutorialFolder
 		end
 	end
 
 	if #stageData.TutorialBlocks > 0 then
-		print("VisualEffectController: Tutorial Ghosts Drawn")
+		print("VisualEffectController: Tutorial Ghosts Drawn (Colored)")
 	end
 end
 
@@ -127,4 +132,4 @@ UpdateStageEvent.OnClientEvent:Connect(function(index, data)
 	drawTutorialGhosts(data)
 end)
 
-print("VisualEffectController Loaded with Robust Rendering")
+print("VisualEffectController Loaded with Colored Ghosts")
