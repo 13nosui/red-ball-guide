@@ -1,4 +1,5 @@
 -- src/Server/GameManager.server.luau
+local Players = game:GetService("Players") -- 追加
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -18,43 +19,35 @@ local MAGNET_RADIUS = HOLE_SIZE * 1.5
 local MAX_CAPTURE_SPEED = 40
 
 -- ■ ステージデータ
--- TutorialBlocks: {Type, Position, Rotation} のリスト
 local STAGE_DATA = {
 	[1] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(0, -2, -20),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20) },
 		Fans = {},
-		TutorialBlocks = {}, -- なし
+		-- ★確認用: ステージ1にもゴーストを追加
+		TutorialBlocks = {
+			-- ゴール手前にブロックを置くガイドを表示
+			{ Type = "Block", Position = Vector3.new(0, 2, -10), Rotation = Vector3.new(0, 0, 0) },
+		},
 	},
 	[2] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(20, -2, -20),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20), Vector3.new(20, 2, -20) },
 		Fans = {},
-		TutorialBlocks = {}, -- なし（自分で考える）
+		TutorialBlocks = {},
 	},
-	-- Stage 3: 坂道チュートリアル
-	-- 下の床がない部分にWedgeを置いて橋渡し＆加速させる
 	[3] = {
 		Start = Vector3.new(0, 30, 20),
 		Goal = Vector3.new(0, -2, -30),
-		Waypoints = {
-			Vector3.new(0, 30, 20),
-			Vector3.new(0, 2, 20),
-			Vector3.new(0, 2, 0),
-			Vector3.new(0, 2, -30),
-		},
+		Waypoints = { Vector3.new(0, 30, 20), Vector3.new(0, 2, 20), Vector3.new(0, 2, 0), Vector3.new(0, 2, -30) },
 		Fans = {},
 		TutorialBlocks = {
-			-- 落下地点にWedgeを置いて滑り台にする
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 20), Rotation = Vector3.new(0, 180, 0) },
-			-- もう一つ繋げてスムーズにする
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 16), Rotation = Vector3.new(0, 180, 0) },
 		},
 	},
-	-- Stage 4: 扇風機チュートリアル
-	-- 穴を埋めるためのブロックを示す
 	[4] = {
 		Start = Vector3.new(0, 15, 30),
 		Goal = Vector3.new(0, -2, -30),
@@ -68,20 +61,16 @@ local STAGE_DATA = {
 		Fans = {
 			{
 				Position = Vector3.new(0, 2, 0),
-				Direction = Vector3.new(0, 0, -1), -- 奥へ
+				Direction = Vector3.new(0, 0, -1),
 				Power = 60,
 				Size = Vector3.new(8, 8, 20),
 			},
 		},
 		TutorialBlocks = {
-			-- スタート直後の着地点を作る
 			{ Type = "Block", Position = Vector3.new(0, 2, 30), Rotation = Vector3.new(0, 0, 0) },
-			-- 風の手前まで道をつなぐ
 			{ Type = "Block", Position = Vector3.new(0, 2, 26), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
-	-- Stage 5: 風×坂道
-	-- 風で流された先にある壁（坂道）を示す
 	[5] = {
 		Start = Vector3.new(-20, 15, 0),
 		Goal = Vector3.new(20, 10, 0),
@@ -95,17 +84,14 @@ local STAGE_DATA = {
 		Fans = {
 			{
 				Position = Vector3.new(-10, 2, 0),
-				Direction = Vector3.new(1, 0, 0), -- 右へ
+				Direction = Vector3.new(1, 0, 0),
 				Power = 80,
 				Size = Vector3.new(20, 8, 8),
 			},
 		},
 		TutorialBlocks = {
-			-- 右側の壁際にWedgeを置いて、風の力で登らせる
 			{ Type = "Wedge", Position = Vector3.new(16, 2, 0), Rotation = Vector3.new(0, -90, 0) },
-			-- 高さを稼ぐためのBlock
 			{ Type = "Block", Position = Vector3.new(20, 2, 0), Rotation = Vector3.new(0, 0, 0) },
-			-- 最後のゴールの足場
 			{ Type = "Block", Position = Vector3.new(20, 6, 0), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
@@ -131,15 +117,12 @@ RunService.Heartbeat:Connect(function(dt)
 	if not currentBall or currentBall.Anchored then
 		return
 	end
-
 	for _, zoneData in ipairs(activeWindZones) do
 		local zonePart = zoneData.Part
 		local direction = zoneData.Direction
 		local power = zoneData.Power
-
 		local relPos = zonePart.CFrame:PointToObjectSpace(currentBall.Position)
 		local size = zonePart.Size
-
 		if
 			math.abs(relPos.X) <= size.X / 2
 			and math.abs(relPos.Y) <= size.Y / 2
@@ -245,7 +228,6 @@ local function captureBallIntoHole(ball, cupCenterPosition)
 	loadStage(currentStageIndex)
 end
 
--- ■ ユーザーブロック消去
 clearUserBlocks = function()
 	local folder = workspace:FindFirstChild("PlacedBlocks")
 	if folder then
@@ -253,9 +235,7 @@ clearUserBlocks = function()
 	end
 end
 
--- ■ 地面生成 (省略)
 local function createFloorWithGap(gapPosition, gapSize)
-	-- (既存コードと同じため、変更点のみ記述: なし)
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if baseplate then
 		baseplate:Destroy()
@@ -324,7 +304,6 @@ local function createFloorWithGap(gapPosition, gapSize)
 	floorModel.Parent = workspace
 end
 
--- ■ ボール生成
 spawnBall = function()
 	if currentBall then
 		currentBall:Destroy()
@@ -344,7 +323,6 @@ spawnBall = function()
 	return ball
 end
 
--- ■ ゴール生成
 local function spawnGoal()
 	local existingGoal = workspace:FindFirstChild("GoalModel")
 	if existingGoal then
@@ -433,7 +411,6 @@ local function spawnGoal()
 	end
 end
 
--- ステージロード
 loadStage = function(index)
 	isGoalLocked = false
 	currentStageIndex = index
@@ -443,7 +420,6 @@ loadStage = function(index)
 		end
 	end
 	activeWindZones = {}
-
 	local data = STAGE_DATA[index]
 	if data then
 		currentStartPos = data.Start
@@ -477,8 +453,21 @@ resetGame = function()
 	spawnBall()
 	print("Game Reset (Ball only)")
 end
+
+-- ★追加: プレイヤーが入室したら、現在のステージ情報を再送する
+Players.PlayerAdded:Connect(function(player)
+	-- 少し待ってから送信（クライアントの準備待ち）
+	task.wait(2)
+	local data = STAGE_DATA[currentStageIndex]
+	if data then
+		UpdateStageEvent:FireClient(player, currentStageIndex, data)
+	end
+end)
+
+-- 初期化
 task.wait(1)
 loadStage(1)
+
 GameControlEvent.OnServerEvent:Connect(function(player, action)
 	if action == "start" then
 		startGame()
@@ -487,4 +476,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Tutorial Ghost Blocks Added")
+print("GameManager Updated: Tutorial Ghosts Fix (PlayerAdded sync)")

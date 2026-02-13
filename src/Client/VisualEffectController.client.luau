@@ -15,7 +15,6 @@ local tutorialFolder = workspace:FindFirstChild("TutorialGhosts") or Instance.ne
 tutorialFolder.Name = "TutorialGhosts"
 tutorialFolder.Parent = workspace
 
--- 点線描画 (既存)
 local function createDottedLine(startPos, endPos)
 	local distance = (endPos - startPos).Magnitude
 	local direction = (endPos - startPos).Unit
@@ -57,7 +56,6 @@ local function drawGuidePath(stageData)
 	print("VisualEffectController: Guide Path Drawn")
 end
 
--- ★チュートリアルゴースト描画 (新規)
 local function drawTutorialGhosts(stageData)
 	tutorialFolder:ClearAllChildren()
 
@@ -69,7 +67,6 @@ local function drawTutorialGhosts(stageData)
 		local part
 		local bType = blockInfo.Type
 
-		-- 形状生成
 		if bType == "Block" then
 			part = Instance.new("Part")
 			part.Shape = Enum.PartType.Block
@@ -88,27 +85,31 @@ local function drawTutorialGhosts(stageData)
 
 		if part then
 			part.Size = Vector3.new(4, 4, 4)
-			part.Material = Enum.Material.ForceField -- ホログラムっぽい素材
-			part.Color = Palette.System.TutorialGhost
+			part.Material = Enum.Material.ForceField
+
+			-- ★修正: Paletteがnilでもエラーにならないようにする
+			if Palette.System and Palette.System.TutorialGhost then
+				part.Color = Palette.System.TutorialGhost
+			else
+				part.Color = Color3.new(1, 1, 0) -- 黄色 (Fallback)
+			end
+
 			part.Transparency = 0.6
 			part.Anchored = true
 			part.CanCollide = false
 			part.CastShadow = false
 
-			-- 位置と回転
 			local rot = blockInfo.Rotation
 			part.CFrame = CFrame.new(blockInfo.Position)
 				* CFrame.Angles(math.rad(rot.X), math.rad(rot.Y), math.rad(rot.Z))
 
-			-- ハイライト枠線 (目立たせる)
 			local highlight = Instance.new("Highlight")
-			highlight.FillColor = Palette.System.TutorialGhost
+			highlight.FillColor = part.Color
 			highlight.OutlineColor = Color3.new(1, 1, 1)
 			highlight.FillTransparency = 0.8
 			highlight.OutlineTransparency = 0
 			highlight.Parent = part
 
-			-- アニメーション (ゆっくり点滅)
 			local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
 			TweenService:Create(part, tweenInfo, { Transparency = 0.3 }):Play()
 
@@ -126,4 +127,4 @@ UpdateStageEvent.OnClientEvent:Connect(function(index, data)
 	drawTutorialGhosts(data)
 end)
 
-print("VisualEffectController Loaded with Tutorial Ghosts")
+print("VisualEffectController Loaded with Robust Rendering")
