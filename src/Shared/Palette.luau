@@ -12,7 +12,7 @@ Palette.BlockColors = {
 
 -- キャラクター・エンティティ
 Palette.Entity = {
-	Ball = Color3.fromHex("#DC2626"), -- Red 600 (主役の赤)
+	Ball = Color3.fromHex("#DC2626"), -- Red 600
 }
 
 -- システムカラー
@@ -21,6 +21,7 @@ Palette.System = {
 	Selection = Color3.fromHex("#F59E0B"), -- Amber 500
 	Success = Color3.fromHex("#22C55E"), -- Green 500
 	Error = Color3.fromHex("#EF4444"), -- Red 500
+	Move = Color3.fromHex("#06B6D4"), -- Cyan 500 (移動ボタン用)
 }
 
 return Palette

@@ -11,10 +11,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Events = Shared:WaitForChild("Events")
 local PlaceBlockEvent = require(Events:WaitForChild("PlaceBlockEvent"))
 local UpdateBlockEvent = require(Events:WaitForChild("UpdateBlockEvent"))
--- パレット読み込み
 local Palette = require(Shared:WaitForChild("Palette"))
 
--- UI取得
 local playerGui = player:WaitForChild("PlayerGui")
 local screenGui = playerGui:WaitForChild("ScreenGui", 10)
 if not screenGui then
@@ -28,12 +26,21 @@ local buttonSphere = drawerMenu:WaitForChild("ButtonSphere")
 local buttonWedge = drawerMenu:WaitForChild("ButtonWedge")
 
 local controlPanel = editFrame:WaitForChild("ControlPanel")
+-- 回転ボタン
 local buttonRotateX = controlPanel:WaitForChild("ButtonRotateX")
 local buttonRotateY = controlPanel:WaitForChild("ButtonRotateY")
 local buttonRotateZ = controlPanel:WaitForChild("ButtonRotateZ")
+-- 移動ボタン
+local buttonUp = controlPanel:WaitForChild("ButtonUp")
+local buttonDown = controlPanel:WaitForChild("ButtonDown")
+local buttonLeft = controlPanel:WaitForChild("ButtonLeft")
+local buttonRight = controlPanel:WaitForChild("ButtonRight")
+local buttonForward = controlPanel:WaitForChild("ButtonForward")
+local buttonBackward = controlPanel:WaitForChild("ButtonBackward")
 
 -- 設定
 local GRID_SIZE = 4
+local MOVE_STEP = 4 -- 1マスの移動距離
 
 -- 状態
 local isDragging = false
@@ -42,7 +49,6 @@ local ghostPart = nil
 
 local selectedBlock = nil
 local selectionBox = Instance.new("SelectionBox")
--- パレットのSelectionカラーを使用
 selectionBox.Color3 = Palette.System.Selection
 selectionBox.LineThickness = 0.05
 selectionBox.Parent = playerGui
@@ -51,12 +57,11 @@ local raycastParams = RaycastParams.new()
 raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 raycastParams.FilterDescendantsInstances = { player.Character }
 
--- ■ ヘルパー関数: ゴースト生成
+-- Helper Functions
 local function createGhost(blockType)
 	if ghostPart then
 		ghostPart:Destroy()
 	end
-
 	local part
 	if blockType == "Block" then
 		part = Instance.new("Part")
@@ -73,23 +78,19 @@ local function createGhost(blockType)
 		part.Shape = Enum.PartType.Cylinder
 		part.CFrame = part.CFrame * CFrame.Angles(0, 0, math.rad(90))
 	end
-
 	if part then
 		part.Size = Vector3.new(4, 4, 4)
 		part.Transparency = 0.5
 		part.CanCollide = false
 		part.CastShadow = false
 		part.Material = Enum.Material.ForceField
-		-- パレットから色を取得して適用
 		part.Color = Palette.BlockColors[blockType] or Palette.System.Ghost
 		part.Anchored = true
 		part.Parent = workspace
-
 		local currentFilter = raycastParams.FilterDescendantsInstances
 		table.insert(currentFilter, part)
 		raycastParams.FilterDescendantsInstances = currentFilter
 	end
-
 	return part
 end
 
@@ -100,7 +101,7 @@ local function getSnappedPosition(position)
 	return Vector3.new(snappedX, snappedY, snappedZ)
 end
 
--- ■ ドラッグ処理
+-- Dragging
 local function setupDragButton(button, blockType)
 	button.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -122,7 +123,6 @@ RunService.RenderStepped:Connect(function()
 		local mouseLocation = UserInputService:GetMouseLocation()
 		local ray = workspace.CurrentCamera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
 		local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
-
 		if result then
 			ghostPart.Position = getSnappedPosition(result.Position)
 			ghostPart.Transparency = 0.5
@@ -148,7 +148,7 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
 	end
 end)
 
--- ■ 選択機能
+-- Selection & Update
 UpdateBlockEvent.OnClientEvent:Connect(function(block)
 	if block then
 		selectedBlock = block
@@ -156,31 +156,51 @@ UpdateBlockEvent.OnClientEvent:Connect(function(block)
 	end
 end)
 
--- ■ 回転処理
-local function rotateSelectedBlock(degreesVector)
+local function requestUpdate(action, value)
 	if selectedBlock and selectedBlock.Parent then
-		UpdateBlockEvent:FireServer(selectedBlock, "rotate", degreesVector)
+		UpdateBlockEvent:FireServer(selectedBlock, action, value)
 	end
 end
 
+-- Rotation
 buttonRotateX.MouseButton1Click:Connect(function()
-	rotateSelectedBlock(Vector3.new(90, 0, 0))
+	requestUpdate("rotate", Vector3.new(90, 0, 0))
 end)
 buttonRotateY.MouseButton1Click:Connect(function()
-	rotateSelectedBlock(Vector3.new(0, 90, 0))
+	requestUpdate("rotate", Vector3.new(0, 90, 0))
 end)
 buttonRotateZ.MouseButton1Click:Connect(function()
-	rotateSelectedBlock(Vector3.new(0, 0, 90))
+	requestUpdate("rotate", Vector3.new(0, 0, 90))
 end)
 
--- ■ 入力処理
+-- Movement (移動ボタン)
+buttonUp.MouseButton1Click:Connect(function()
+	requestUpdate("move", Vector3.new(0, MOVE_STEP, 0))
+end)
+buttonDown.MouseButton1Click:Connect(function()
+	requestUpdate("move", Vector3.new(0, -MOVE_STEP, 0))
+end)
+buttonLeft.MouseButton1Click:Connect(function()
+	requestUpdate("move", Vector3.new(-MOVE_STEP, 0, 0))
+end)
+buttonRight.MouseButton1Click:Connect(function()
+	requestUpdate("move", Vector3.new(MOVE_STEP, 0, 0))
+end)
+buttonForward.MouseButton1Click:Connect(function()
+	requestUpdate("move", Vector3.new(0, 0, -MOVE_STEP))
+end)
+buttonBackward.MouseButton1Click:Connect(function()
+	requestUpdate("move", Vector3.new(0, 0, MOVE_STEP))
+end)
+
+-- Key Input
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
 
 	if input.KeyCode == Enum.KeyCode.R then
-		rotateSelectedBlock(Vector3.new(0, 90, 0))
+		requestUpdate("rotate", Vector3.new(0, 90, 0))
 	end
 
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -189,7 +209,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if target and target.Name:match("^PlacedBlock_") then
 			clickedBlock = true
 		end
-
 		if not clickedBlock then
 			selectedBlock = nil
 			selectionBox.Adornee = nil
@@ -197,4 +216,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
-print("Placement Controller with Palette Loaded")
+print("Placement Controller with Move Support Loaded")

@@ -5,18 +5,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- パレット読み込み
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Palette = require(Shared:WaitForChild("Palette"))
 
--- メインのScreenGui作成
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ScreenGui"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
--- エディット用フレーム
 local editFrame = Instance.new("Frame")
 editFrame.Name = "EditFrame"
 editFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -75,13 +72,11 @@ drawerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 drawerLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 drawerLayout.Parent = drawerFrame
 
--- ■ ヘルパー関数: 3Dアイコンボタン
 local function create3DButton(name, blockType, parent)
 	local btn = Instance.new("ImageButton")
 	btn.Name = name
 	btn.Size = UDim2.new(0, 70, 0, 70)
 	btn.Parent = parent
-
 	applyGlassStyle(btn, 20)
 
 	local viewport = Instance.new("ViewportFrame")
@@ -124,7 +119,6 @@ local function create3DButton(name, blockType, parent)
 			end
 		end)
 	end
-
 	return btn
 end
 
@@ -132,11 +126,12 @@ local btnBlock = create3DButton("ButtonBlock", "Block", drawerFrame)
 local btnSphere = create3DButton("ButtonSphere", "Sphere", drawerFrame)
 local btnWedge = create3DButton("ButtonWedge", "Wedge", drawerFrame)
 
--- 2. 操作パネル（回転）
+-- 2. 操作パネル（移動＆回転）
 local controlPanel = Instance.new("Frame")
 controlPanel.Name = "ControlPanel"
-controlPanel.Size = UDim2.new(0, 260, 0, 80)
-controlPanel.AnchorPoint = Vector2.new(0.5, 1) -- 下中央基準
+-- 幅を広げて移動ボタン用のスペースを確保
+controlPanel.Size = UDim2.new(0, 500, 0, 80)
+controlPanel.AnchorPoint = Vector2.new(0.5, 1)
 controlPanel.Position = UDim2.new(0.5, 0, 0.95, 0)
 controlPanel.Parent = editFrame
 
@@ -146,10 +141,10 @@ local panelLayout = Instance.new("UIListLayout")
 panelLayout.FillDirection = Enum.FillDirection.Horizontal
 panelLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 panelLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-panelLayout.Padding = UDim.new(0, 15)
+panelLayout.Padding = UDim.new(0, 10) -- パディングを少し詰める
 panelLayout.Parent = controlPanel
 
--- Helper: テキストボタン（サイズ指定可能に拡張）
+-- Helper: テキストボタン
 local function createTextButton(name, text, parent, color, size)
 	local btn = Instance.new("TextButton")
 	btn.Name = name
@@ -159,27 +154,51 @@ local function createTextButton(name, text, parent, color, size)
 	btn.Font = Enum.Font.GothamMedium
 	btn.TextSize = 16
 	btn.Parent = parent
-
 	applyGlassStyle(btn, 25)
-
 	btn.BackgroundColor3 = color
 	btn.BackgroundTransparency = 0.5
-
 	return btn
 end
 
-local btnRotX = createTextButton("ButtonRotateX", "X", controlPanel, Color3.fromRGB(255, 80, 80))
-local btnRotY = createTextButton("ButtonRotateY", "Y", controlPanel, Color3.fromRGB(80, 255, 80))
-local btnRotZ = createTextButton("ButtonRotateZ", "Z", controlPanel, Color3.fromRGB(80, 80, 255))
+-- ■ 移動ボタン群（左側）
+local moveColor = Palette.System.Move
+-- 上昇/下降
+local btnUp = createTextButton("ButtonUp", "Up", controlPanel, moveColor)
+local btnDown = createTextButton("ButtonDown", "Down", controlPanel, moveColor)
 
--- 3. ヘッダー（ステージ表示）
+-- 区切り線（装飾）
+local separator = Instance.new("Frame")
+separator.Name = "Separator"
+separator.Size = UDim2.new(0, 2, 0, 40)
+separator.BackgroundColor3 = Color3.new(1, 1, 1)
+separator.BackgroundTransparency = 0.8
+separator.Parent = controlPanel
+
+-- 平面移動（←, ↑, ↓, →）※矢印記号を使用
+local btnLeft = createTextButton("ButtonLeft", "←", controlPanel, moveColor)
+local btnForward = createTextButton("ButtonForward", "↑", controlPanel, moveColor)
+local btnBackward = createTextButton("ButtonBackward", "↓", controlPanel, moveColor)
+local btnRight = createTextButton("ButtonRight", "→", controlPanel, moveColor)
+
+-- 区切り線
+local separator2 = separator:Clone()
+separator2.Parent = controlPanel
+
+-- ■ 回転ボタン群（右側・既存）
+local btnRotX =
+	createTextButton("ButtonRotateX", "Rot X", controlPanel, Color3.fromRGB(255, 80, 80), UDim2.new(0, 60, 0, 50))
+local btnRotY =
+	createTextButton("ButtonRotateY", "Rot Y", controlPanel, Color3.fromRGB(80, 255, 80), UDim2.new(0, 60, 0, 50))
+local btnRotZ =
+	createTextButton("ButtonRotateZ", "Rot Z", controlPanel, Color3.fromRGB(80, 80, 255), UDim2.new(0, 60, 0, 50))
+
+-- 3. ヘッダー
 local headerFrame = Instance.new("Frame")
 headerFrame.Name = "HeaderFrame"
 headerFrame.Size = UDim2.new(0, 180, 0, 50)
 headerFrame.Position = UDim2.new(0.5, 0, 0.08, 0)
 headerFrame.AnchorPoint = Vector2.new(0.5, 0)
 headerFrame.Parent = editFrame
-
 applyGlassStyle(headerFrame, 25)
 
 local stageLabel = Instance.new("TextLabel")
@@ -192,14 +211,13 @@ stageLabel.Font = Enum.Font.GothamBold
 stageLabel.TextSize = 22
 stageLabel.Parent = headerFrame
 
--- 4. アクションパネル（右下：スタート/リセット）
+-- 4. アクションパネル
 local actionPanel = Instance.new("Frame")
 actionPanel.Name = "ActionPanel"
-actionPanel.Size = UDim2.new(0, 180, 0, 80) -- 高さをControlPanel(80)に合わせる
-actionPanel.AnchorPoint = Vector2.new(1, 1) -- 右下基準
-actionPanel.Position = UDim2.new(0.95, 0, 0.95, 0) -- 右端から少し余裕を持たせる（高さはControlPanelと同じ0.95）
+actionPanel.Size = UDim2.new(0, 180, 0, 80)
+actionPanel.AnchorPoint = Vector2.new(1, 1)
+actionPanel.Position = UDim2.new(0.95, 0, 0.95, 0)
 actionPanel.Parent = editFrame
-
 applyGlassStyle(actionPanel, 40)
 
 local actionLayout = Instance.new("UIListLayout")
@@ -209,8 +227,7 @@ actionLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 actionLayout.Padding = UDim.new(0, 15)
 actionLayout.Parent = actionPanel
 
--- パレットのSystemカラーを使用してボタン作成
 local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
 local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
 
-print("UI Setup Completed: Action Panel Added")
+print("UI Setup with Move Controller Loaded")
