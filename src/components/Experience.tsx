@@ -1,4 +1,5 @@
-import { Physics, RigidBody } from '@react-three/rapier';
+// ▼ CuboidCollider をインポートに追加 ▼
+import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { OrbitControls, Instances, Instance } from '@react-three/drei';
 import { Player } from './Player';
 import { useStore } from '../store/useStore';
@@ -18,10 +19,10 @@ export function Experience() {
             <Physics gravity={[0, -9.81, 0]}>
                 <Player />
 
-                {/* ▼ 厚みを持たせた見えない床（トンネリング防止） ▼ */}
                 <RigidBody type="fixed" position={[0, -6.9, 0]} friction={0.5}>
+                    {/* ▼ 見えない床が確実に判定を持つように明示 ▼ */}
+                    <CuboidCollider args={[50, 1, 50]} />
                     <mesh visible={false}>
-                        {/* 厚さを 0.2 から 2 に変更。上面の高さは以前と同じになるよう調整済み */}
                         <boxGeometry args={[100, 2, 100]} />
                         <meshStandardMaterial color="black" />
                     </mesh>
@@ -72,7 +73,14 @@ function MovableSlope() {
     const slopeRot = useStore((state) => state.slopeRot);
 
     return (
-        <RigidBody type="kinematicPosition" position={slopePos} rotation={slopeRot}>
+        <RigidBody
+            type="kinematicPosition"
+            position={slopePos}
+            rotation={slopeRot}
+            // ▼ 四角い判定ではなく「実際の三角形の見た目」に当たり判定を合わせる ▼
+            colliders="hull"
+            friction={0.2}
+        >
             <mesh castShadow receiveShadow>
                 <cylinderGeometry args={[1, 1, 2, 3]} />
                 <meshStandardMaterial color="#fbbf24" roughness={0.8} flatShading={true} />
