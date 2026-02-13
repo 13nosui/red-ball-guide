@@ -13,6 +13,9 @@ Palette.BlockColors = {
 -- キャラクター・エンティティ
 Palette.Entity = {
 	Ball = Color3.fromHex("#DC2626"), -- Red 600
+	GoalBase = Color3.fromHex("#15803d"), -- Green 700 (芝生)
+	GoalFlag = Color3.fromHex("#eab308"), -- Yellow 500 (旗)
+	GoalPole = Color3.fromHex("#f8fafc"), -- Slate 50 (ポール)
 }
 
 -- システムカラー
@@ -21,7 +24,7 @@ Palette.System = {
 	Selection = Color3.fromHex("#F59E0B"), -- Amber 500
 	Success = Color3.fromHex("#22C55E"), -- Green 500
 	Error = Color3.fromHex("#EF4444"), -- Red 500
-	Move = Color3.fromHex("#06B6D4"), -- Cyan 500 (移動ボタン用)
+	Move = Color3.fromHex("#06B6D4"), -- Cyan 500
 }
 
 return Palette
