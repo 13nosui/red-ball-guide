@@ -1,7 +1,7 @@
 -- src/Client/UISetup.client.luau
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage") -- 追加
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -103,7 +103,6 @@ local function create3DButton(name, blockType, parent)
 
 	if part then
 		part.Size = Vector3.new(4, 4, 4)
-		-- パレットから色を適用
 		part.Color = Palette.BlockColors[blockType] or Color3.new(1, 1, 1)
 		part.Material = Enum.Material.Plastic
 		part.Reflectance = 0.1
@@ -172,4 +171,24 @@ local btnRotX = createTextButton("ButtonRotateX", "X", controlPanel, Color3.from
 local btnRotY = createTextButton("ButtonRotateY", "Y", controlPanel, Color3.fromRGB(80, 255, 80))
 local btnRotZ = createTextButton("ButtonRotateZ", "Z", controlPanel, Color3.fromRGB(80, 80, 255))
 
-print("UI Setup with Palette Loaded")
+-- 3. ヘッダー（ステージ表示）
+local headerFrame = Instance.new("Frame")
+headerFrame.Name = "HeaderFrame"
+headerFrame.Size = UDim2.new(0, 180, 0, 50)
+headerFrame.Position = UDim2.new(0.5, 0, 0.08, 0) -- 上部から少し離す
+headerFrame.AnchorPoint = Vector2.new(0.5, 0) -- 中央揃え
+headerFrame.Parent = editFrame
+
+applyGlassStyle(headerFrame, 25) -- 丸角とすりガラス適用
+
+local stageLabel = Instance.new("TextLabel")
+stageLabel.Name = "StageLabel"
+stageLabel.Size = UDim2.new(1, 0, 1, 0)
+stageLabel.BackgroundTransparency = 1
+stageLabel.Text = "Stage: 01"
+stageLabel.TextColor3 = Color3.new(1, 1, 1) -- 白文字
+stageLabel.Font = Enum.Font.GothamBold
+stageLabel.TextSize = 22
+stageLabel.Parent = headerFrame
+
+print("UI Setup with Stage Header Loaded")
