@@ -18,10 +18,9 @@ Palette.Entity = {
 	GoalPole = Color3.fromHex("#f8fafc"), -- Slate 50
 	GoalCup = Color3.fromHex("#334155"), -- Slate 700
 
-	-- ★扇風機ギミック
-	FanHousing = Color3.fromHex("#64748b"), -- Slate 500 (外装)
-	FanBlade = Color3.fromHex("#f1f5f9"), -- Slate 100 (羽根)
-	WindZone = Color3.fromHex("#bae6fd"), -- Sky 200 (風の可視化エリア)
+	FanHousing = Color3.fromHex("#64748b"), -- Slate 500
+	FanBlade = Color3.fromHex("#f1f5f9"), -- Slate 100
+	WindZone = Color3.fromHex("#bae6fd"), -- Sky 200
 }
 
 -- システムカラー
@@ -31,6 +30,9 @@ Palette.System = {
 	Success = Color3.fromHex("#22C55E"), -- Green 500
 	Error = Color3.fromHex("#EF4444"), -- Red 500
 	Move = Color3.fromHex("#06B6D4"), -- Cyan 500
+
+	-- ★チュートリアル用ガイド色 (点滅する黄色)
+	TutorialGhost = Color3.fromHex("#FDE047"), -- Yellow 300
 }
 
 return Palette

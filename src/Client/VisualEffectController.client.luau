@@ -1,7 +1,9 @@
 -- src/Client/VisualEffectController.client.luau
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Events = Shared:WaitForChild("Events")
+local Palette = require(Shared:WaitForChild("Palette"))
 
 local UpdateStageEvent = require(Events:WaitForChild("UpdateStageEvent"))
 
@@ -9,6 +11,11 @@ local guideFolder = workspace:FindFirstChild("GuidePath") or Instance.new("Folde
 guideFolder.Name = "GuidePath"
 guideFolder.Parent = workspace
 
+local tutorialFolder = workspace:FindFirstChild("TutorialGhosts") or Instance.new("Folder")
+tutorialFolder.Name = "TutorialGhosts"
+tutorialFolder.Parent = workspace
+
+-- 点線描画 (既存)
 local function createDottedLine(startPos, endPos)
 	local distance = (endPos - startPos).Magnitude
 	local direction = (endPos - startPos).Unit
@@ -17,12 +24,10 @@ local function createDottedLine(startPos, endPos)
 	local step = segmentLength + gapLength
 
 	for i = 0, distance, step do
-		-- 残りの距離がセグメントより短い場合はそこで止める
 		local actualLen = math.min(segmentLength, distance - i)
 		if actualLen <= 0 then
 			break
 		end
-
 		local part = Instance.new("Part")
 		part.Name = "GuideDot"
 		part.Size = Vector3.new(0.4, 0.4, actualLen)
@@ -30,42 +35,95 @@ local function createDottedLine(startPos, endPos)
 		part.CanCollide = false
 		part.CastShadow = false
 		part.Material = Enum.Material.Neon
-		part.Color = Color3.fromRGB(100, 255, 255) -- シアン色の光る線
-
-		-- 位置計算: スタートからi + 半分の長さ進んだところ
-		local centerPos = startPos + direction * (i + actualLen / 2)
-		part.CFrame = CFrame.new(centerPos, endPos)
+		part.Color = Color3.fromRGB(100, 255, 255)
+		part.CFrame = CFrame.new(startPos + direction * (i + actualLen / 2), endPos)
 		part.Parent = guideFolder
 	end
 end
 
 local function drawGuidePath(stageData)
 	guideFolder:ClearAllChildren()
-
 	if not stageData or not stageData.Waypoints then
 		return
 	end
-
-	-- 全ポイントをリスト化: [Start, ...Waypoints, Goal]
 	local points = { stageData.Start }
 	for _, wp in ipairs(stageData.Waypoints) do
 		table.insert(points, wp)
 	end
-	-- Goalの少し上を終点にする（ボールの中心座標合わせ）
 	table.insert(points, Vector3.new(stageData.Goal.X, 0, stageData.Goal.Z))
-
-	-- 点をつなぐ
 	for i = 1, #points - 1 do
-		local p1 = points[i]
-		local p2 = points[i + 1]
-		createDottedLine(p1, p2)
+		createDottedLine(points[i], points[i + 1])
+	end
+	print("VisualEffectController: Guide Path Drawn")
+end
+
+-- ★チュートリアルゴースト描画 (新規)
+local function drawTutorialGhosts(stageData)
+	tutorialFolder:ClearAllChildren()
+
+	if not stageData or not stageData.TutorialBlocks then
+		return
 	end
 
-	print("VisualEffectController: Guide Path Drawn")
+	for _, blockInfo in ipairs(stageData.TutorialBlocks) do
+		local part
+		local bType = blockInfo.Type
+
+		-- 形状生成
+		if bType == "Block" then
+			part = Instance.new("Part")
+			part.Shape = Enum.PartType.Block
+		elseif bType == "Sphere" then
+			part = Instance.new("Part")
+			part.Shape = Enum.PartType.Ball
+		elseif bType == "Wedge" then
+			part = Instance.new("WedgePart")
+		elseif bType == "CornerWedge" then
+			part = Instance.new("CornerWedgePart")
+		elseif bType == "Cylinder" then
+			part = Instance.new("Part")
+			part.Shape = Enum.PartType.Cylinder
+			part.CFrame = part.CFrame * CFrame.Angles(0, 0, math.rad(90))
+		end
+
+		if part then
+			part.Size = Vector3.new(4, 4, 4)
+			part.Material = Enum.Material.ForceField -- ホログラムっぽい素材
+			part.Color = Palette.System.TutorialGhost
+			part.Transparency = 0.6
+			part.Anchored = true
+			part.CanCollide = false
+			part.CastShadow = false
+
+			-- 位置と回転
+			local rot = blockInfo.Rotation
+			part.CFrame = CFrame.new(blockInfo.Position)
+				* CFrame.Angles(math.rad(rot.X), math.rad(rot.Y), math.rad(rot.Z))
+
+			-- ハイライト枠線 (目立たせる)
+			local highlight = Instance.new("Highlight")
+			highlight.FillColor = Palette.System.TutorialGhost
+			highlight.OutlineColor = Color3.new(1, 1, 1)
+			highlight.FillTransparency = 0.8
+			highlight.OutlineTransparency = 0
+			highlight.Parent = part
+
+			-- アニメーション (ゆっくり点滅)
+			local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+			TweenService:Create(part, tweenInfo, { Transparency = 0.3 }):Play()
+
+			part.Parent = tutorialFolder
+		end
+	end
+
+	if #stageData.TutorialBlocks > 0 then
+		print("VisualEffectController: Tutorial Ghosts Drawn")
+	end
 end
 
 UpdateStageEvent.OnClientEvent:Connect(function(index, data)
 	drawGuidePath(data)
+	drawTutorialGhosts(data)
 end)
 
-print("VisualEffectController Loaded")
+print("VisualEffectController Loaded with Tutorial Ghosts")
