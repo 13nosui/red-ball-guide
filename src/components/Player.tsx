@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { RigidBody, RigidBodyApi, CuboidCollider } from '@react-three/rapier';
+import { RigidBody, RigidBodyApi, BallCollider } from '@react-three/rapier';
 import { useStore } from '../store/useStore';
 import * as THREE from 'three';
 
@@ -20,18 +20,19 @@ export function Player() {
     return (
         <RigidBody
             ref={rbRef}
-            // ▼▼▼ ここを追加：名札をつける ▼▼▼
             name="player"
-            // ▲▲▲ ここまで ▲▲▲
             type={isPlaying ? "dynamic" : "kinematicPosition"}
             position={startPos}
             colliders={false}
-            enabledTranslations={[true, true, false]}
-            enabledRotations={[false, false, true]}
+            // ▼▼▼ Z軸方向への移動と回転も解放して、3D空間を転がれるようにする ▼▼▼
+            enabledTranslations={[true, true, true]}
+            enabledRotations={[true, true, true]}
         >
-            <CuboidCollider args={[0.5, 0.5, 0.5]} />
+            {/* ▼▼▼ 四角形から球体（ボール）に変更 ▼▼▼ */}
+            <BallCollider args={[0.5]} />
             <mesh castShadow receiveShadow>
-                <boxGeometry args={[1, 1, 1]} />
+                {/* 32分割の滑らかな球体。あえてflatShadingをつけてレトロ感を出す */}
+                <sphereGeometry args={[0.5, 32, 32]} />
                 <meshStandardMaterial
                     color="#e5484d"
                     roughness={0.8}

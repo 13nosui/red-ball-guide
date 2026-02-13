@@ -7,7 +7,6 @@ export function Experience() {
     return (
         <>
             <color attach="background" args={['#dcdcdc']} />
-
             <ambientLight intensity={0.7} />
             <directionalLight
                 castShadow
@@ -18,7 +17,15 @@ export function Experience() {
 
             <Physics gravity={[0, -9.81, 0]}>
                 <Player />
-                <InvisibleFloor />
+
+                {/* ▼ onClickを削除し、ただの「ボール落下防止用の見えない床」に戻す ▼ */}
+                <RigidBody type="fixed" position={[0, -6, 0]} friction={0.5}>
+                    <mesh visible={false}>
+                        <boxGeometry args={[100, 0.2, 100]} />
+                        <meshStandardMaterial color="black" />
+                    </mesh>
+                </RigidBody>
+
                 <InfiniteTileFloor />
                 <MovableSlope />
                 <Goal />
@@ -35,21 +42,9 @@ export function Experience() {
     );
 }
 
-function InvisibleFloor() {
-    return (
-        <RigidBody type="fixed" position={[0, -6, 0]} friction={0.5}>
-            <mesh visible={false}>
-                <boxGeometry args={[100, 0.2, 100]} />
-                <meshStandardMaterial color="black" />
-            </mesh>
-        </RigidBody>
-    );
-}
-
 function InfiniteTileFloor() {
     const size = 60;
     const half = size / 2;
-
     const tileData = [];
     for (let x = -half; x < half; x++) {
         for (let z = -half; z < half; z++) {
@@ -58,19 +53,13 @@ function InfiniteTileFloor() {
             tileData.push({ position: [x, -5.9, z], color });
         }
     }
-
     return (
         <group>
             <Instances range={tileData.length} limit={tileData.length}>
                 <boxGeometry args={[0.95, 0.2, 0.95]} />
                 <meshStandardMaterial roughness={0.8} flatShading />
-
                 {tileData.map((data, i) => (
-                    <Instance
-                        key={i}
-                        position={data.position as [number, number, number]}
-                        color={data.color}
-                    />
+                    <Instance key={i} position={data.position as [number, number, number]} color={data.color} />
                 ))}
             </Instances>
         </group>
@@ -91,22 +80,17 @@ function MovableSlope() {
     );
 }
 
-/**
- * ▼▼▼ ゴール修正: センサーを追加 ▼▼▼
- */
 function Goal() {
     const setGameStatus = useStore((state) => state.setGameStatus);
     const isPlaying = useStore((state) => state.isPlaying);
 
     return (
-        // sensor propをつけると、物体は突き抜けるが「接触イベント」だけ発生するようになる
         <RigidBody
             type="fixed"
             sensor
             position={[4, -5.79, 0]}
             rotation={[-Math.PI / 2, 0, 0]}
             onIntersectionEnter={({ other }) => {
-                // プレイ中かつ、ぶつかった相手の名前が "player" ならクリア！
                 if (isPlaying && other.rigidBodyObject?.name === "player") {
                     setGameStatus('cleared');
                 }
