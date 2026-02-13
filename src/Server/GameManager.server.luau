@@ -9,32 +9,37 @@ local GameControlEvent = require(Events.GameControlEvent)
 local UpdateStageEvent = require(Events.UpdateStageEvent)
 
 -- 設定
--- Waypoints: ガイドパスの経由点リスト（スタートとゴールの間）
 local STAGE_DATA = {
 	[1] = {
+		-- 直線のみ
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(0, -2, -20),
 		Waypoints = {
-			Vector3.new(0, 10, -5),
-			Vector3.new(0, 5, -12),
+			Vector3.new(0, 15, 0), -- 始点
+			Vector3.new(0, 2, 0), -- 着地地点
+			Vector3.new(0, 2, -20), -- 直進
 		},
 	},
 	[2] = {
+		-- 右に90度曲がるルート (Wedgeで反射させる想定)
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(20, -2, -20),
 		Waypoints = {
-			Vector3.new(0, 10, -5),
-			Vector3.new(10, 5, -12),
-			Vector3.new(15, 2, -18),
+			Vector3.new(0, 15, 0), -- 始点
+			Vector3.new(0, 2, 0), -- 着地
+			Vector3.new(0, 2, -20), -- 直進して...
+			Vector3.new(20, 2, -20), -- ここで右に曲がる（角にWedgeを置くヒント）
 		},
 	},
 	[3] = {
+		-- 2回曲がる複雑なルート
 		Start = Vector3.new(-10, 20, 10),
 		Goal = Vector3.new(10, -2, -30),
 		Waypoints = {
-			Vector3.new(-5, 15, 0),
-			Vector3.new(0, 10, -10),
-			Vector3.new(5, 5, -20),
+			Vector3.new(-10, 20, 10), -- 始点
+			Vector3.new(-10, 2, 10), -- 着地
+			Vector3.new(10, 2, 10), -- 右へ（1回目の反射）
+			Vector3.new(10, 2, -30), -- 奥へ（2回目の反射）
 		},
 	},
 }
@@ -347,7 +352,6 @@ loadStage = function(index)
 		spawnGoal()
 		spawnBall()
 
-		-- ステージ番号とデータをクライアントに送信
 		UpdateStageEvent:FireAllClients(index, data)
 	end
 end
@@ -383,4 +387,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Waypoints Added to Stage Data")
+print("GameManager Updated: Waypoints set to 90-degree turns")
