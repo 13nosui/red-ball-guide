@@ -1,5 +1,5 @@
 -- src/Server/GameManager.server.luau
-local Players = game:GetService("Players") -- 追加
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -18,46 +18,48 @@ local GOAL_WIDTH = 12
 local MAGNET_RADIUS = HOLE_SIZE * 1.5
 local MAX_CAPTURE_SPEED = 40
 
--- ■ ステージデータ
+-- ■ ステージデータ (修正版)
 local STAGE_DATA = {
+	-- Stage 1: 直進 (Wedgeで前へ転がす)
 	[1] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(0, -2, -20),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20) },
 		Fans = {},
-		-- ★確認用: ステージ1にもゴーストを追加
 		TutorialBlocks = {
-			-- ゴール手前にブロックを置くガイドを表示
-			{ Type = "Block", Position = Vector3.new(0, 2, -10), Rotation = Vector3.new(0, 0, 0) },
+			-- スタート真下に、奥(-Z)へ転がる坂を置く
+			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
+	-- Stage 2: 90度反射 (Blockを45度にして反射させる)
 	[2] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(20, -2, -20),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20), Vector3.new(20, 2, -20) },
 		Fans = {},
-		TutorialBlocks = {},
+		TutorialBlocks = {
+			-- スタート地点の加速坂
+			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
+			-- 角で45度傾けたブロックで反射させる (Y軸45度回転)
+			{ Type = "Block", Position = Vector3.new(0, 2, -20), Rotation = Vector3.new(0, 45, 0) },
+		},
 	},
+	-- Stage 3: 長距離坂道 (Wedgeで加速)
 	[3] = {
 		Start = Vector3.new(0, 30, 20),
 		Goal = Vector3.new(0, -2, -30),
 		Waypoints = { Vector3.new(0, 30, 20), Vector3.new(0, 2, 20), Vector3.new(0, 2, 0), Vector3.new(0, 2, -30) },
 		Fans = {},
 		TutorialBlocks = {
-			{ Type = "Wedge", Position = Vector3.new(0, 2, 20), Rotation = Vector3.new(0, 180, 0) },
-			{ Type = "Wedge", Position = Vector3.new(0, 2, 16), Rotation = Vector3.new(0, 180, 0) },
+			-- 着地地点に加速坂
+			{ Type = "Wedge", Position = Vector3.new(0, 2, 20), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
+	-- Stage 4: 扇風機 (風に乗せる)
 	[4] = {
 		Start = Vector3.new(0, 15, 30),
 		Goal = Vector3.new(0, -2, -30),
-		Waypoints = {
-			Vector3.new(0, 15, 30),
-			Vector3.new(0, 2, 30),
-			Vector3.new(0, 2, 0),
-			Vector3.new(0, 5, -15),
-			Vector3.new(0, 2, -30),
-		},
+		Waypoints = { Vector3.new(0, 15, 30), Vector3.new(0, 2, 30), Vector3.new(0, 2, 0), Vector3.new(0, 2, -30) },
 		Fans = {
 			{
 				Position = Vector3.new(0, 2, 0),
@@ -67,10 +69,11 @@ local STAGE_DATA = {
 			},
 		},
 		TutorialBlocks = {
-			{ Type = "Block", Position = Vector3.new(0, 2, 30), Rotation = Vector3.new(0, 0, 0) },
-			{ Type = "Block", Position = Vector3.new(0, 2, 26), Rotation = Vector3.new(0, 0, 0) },
+			-- 風に向かって転がす坂
+			{ Type = "Wedge", Position = Vector3.new(0, 2, 30), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
+	-- Stage 5: 風×ジャンプ (風で加速して坂を登る)
 	[5] = {
 		Start = Vector3.new(-20, 15, 0),
 		Goal = Vector3.new(20, 10, 0),
@@ -90,9 +93,12 @@ local STAGE_DATA = {
 			},
 		},
 		TutorialBlocks = {
-			{ Type = "Wedge", Position = Vector3.new(16, 2, 0), Rotation = Vector3.new(0, -90, 0) },
-			{ Type = "Block", Position = Vector3.new(20, 2, 0), Rotation = Vector3.new(0, 0, 0) },
-			{ Type = "Block", Position = Vector3.new(20, 6, 0), Rotation = Vector3.new(0, 0, 0) },
+			-- 1. スタート地点: 右(+X)へ転がす坂 (RotY = -90)
+			{ Type = "Wedge", Position = Vector3.new(-20, 2, 0), Rotation = Vector3.new(0, -90, 0) },
+
+			-- 2. ジャンプ台: 左向きの坂(+Xへ登る) (RotY = 90)
+			-- 風で加速した後、この坂で上へ飛び出す
+			{ Type = "Wedge", Position = Vector3.new(15, 2, 0), Rotation = Vector3.new(0, 90, 0) },
 		},
 	},
 }
@@ -454,9 +460,7 @@ resetGame = function()
 	print("Game Reset (Ball only)")
 end
 
--- ★追加: プレイヤーが入室したら、現在のステージ情報を再送する
 Players.PlayerAdded:Connect(function(player)
-	-- 少し待ってから送信（クライアントの準備待ち）
 	task.wait(2)
 	local data = STAGE_DATA[currentStageIndex]
 	if data then
@@ -464,7 +468,6 @@ Players.PlayerAdded:Connect(function(player)
 	end
 end)
 
--- 初期化
 task.wait(1)
 loadStage(1)
 
@@ -476,4 +479,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Tutorial Ghosts Fix (PlayerAdded sync)")
+print("GameManager Updated: Tutorial Ghosts Fixed Positions")
