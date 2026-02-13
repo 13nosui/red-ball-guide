@@ -238,13 +238,13 @@ end
 
 -- Rotation Buttons
 buttonRotateX.MouseButton1Click:Connect(function()
-	requestUpdate("rotate", Vector3.new(90, 0, 0))
+	requestUpdate("rotate", Vector3.new(45, 0, 0))
 end)
 buttonRotateY.MouseButton1Click:Connect(function()
 	requestUpdate("rotate", Vector3.new(0, 45, 0))
 end)
 buttonRotateZ.MouseButton1Click:Connect(function()
-	requestUpdate("rotate", Vector3.new(0, 0, 90))
+	requestUpdate("rotate", Vector3.new(0, 0, 45))
 end)
 
 -- Height Buttons
@@ -255,4 +255,4 @@ buttonDown.MouseButton1Click:Connect(function()
 	requestUpdate("move", Vector3.new(0, -MOVE_STEP, 0))
 end)
 
-print("Placement Controller: Drag & Drop Implemented")
+print("Placement Controller: Drag & Drop Implemented (45-degree rotation)")
