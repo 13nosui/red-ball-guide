@@ -1,11 +1,13 @@
 -- src/Server/BlockManager.server.luau
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService") -- 追加
+local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Events = Shared:WaitForChild("Events")
 
 local PlaceBlockEvent = require(Events.PlaceBlockEvent)
 local UpdateBlockEvent = require(Events.UpdateBlockEvent)
+-- パレットを読み込み
+local Palette = require(Shared:WaitForChild("Palette"))
 
 local blocksFolder = workspace:FindFirstChild("PlacedBlocks") or Instance.new("Folder")
 blocksFolder.Name = "PlacedBlocks"
@@ -32,7 +34,8 @@ local function createBlock(blockType)
 
 	if newBlock then
 		newBlock.Material = Enum.Material.Plastic
-		newBlock.BrickColor = BrickColor.new("Bright yellow")
+		-- パレットから色を取得（定義がない場合は白）
+		newBlock.Color = Palette.BlockColors[blockType] or Color3.new(1, 1, 1)
 		newBlock.Anchored = true
 		newBlock.Size = Vector3.new(4, 4, 4)
 		return newBlock
@@ -61,17 +64,13 @@ PlaceBlockEvent.OnServerEvent:Connect(function(player, blockType, position, rota
 	end
 end)
 
--- 更新イベント（回転アニメーション対応）
+-- 更新イベント
 UpdateBlockEvent.OnServerEvent:Connect(function(player, block, action, value)
 	if block and block.Parent and block.Name == "PlacedBlock_" .. player.Name then
 		if action == "rotate" then
-			-- value = Vector3 (Degrees)
 			local rotationCFrame = CFrame.Angles(math.rad(value.X), math.rad(value.Y), math.rad(value.Z))
-
-			-- 目標となるCFrameを計算
 			local targetCFrame = block.CFrame * rotationCFrame
 
-			-- Tweenの設定 (0.3秒で滑らかに動かす)
 			local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			local tween = TweenService:Create(block, tweenInfo, { CFrame = targetCFrame })
 			tween:Play()
@@ -81,4 +80,4 @@ UpdateBlockEvent.OnServerEvent:Connect(function(player, block, action, value)
 	end
 end)
 
-print("BlockManager with Tween Rotation Updated")
+print("BlockManager with Palette Loaded")

@@ -5,15 +5,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local mouse = player:GetMouse() -- ★ここを追加しました
+local mouse = player:GetMouse()
 
--- イベントの取得
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Events = Shared:WaitForChild("Events")
 local PlaceBlockEvent = require(Events:WaitForChild("PlaceBlockEvent"))
 local UpdateBlockEvent = require(Events:WaitForChild("UpdateBlockEvent"))
+-- パレット読み込み
+local Palette = require(Shared:WaitForChild("Palette"))
 
--- UIの取得
+-- UI取得
 local playerGui = player:WaitForChild("PlayerGui")
 local screenGui = playerGui:WaitForChild("ScreenGui", 10)
 if not screenGui then
@@ -21,14 +22,11 @@ if not screenGui then
 end
 
 local editFrame = screenGui:WaitForChild("EditFrame")
-
--- ドロワーメニュー内のボタンを取得
 local drawerMenu = editFrame:WaitForChild("DrawerMenu")
 local buttonBlock = drawerMenu:WaitForChild("ButtonBlock")
 local buttonSphere = drawerMenu:WaitForChild("ButtonSphere")
 local buttonWedge = drawerMenu:WaitForChild("ButtonWedge")
 
--- コントロールパネル内のボタンを取得
 local controlPanel = editFrame:WaitForChild("ControlPanel")
 local buttonRotateX = controlPanel:WaitForChild("ButtonRotateX")
 local buttonRotateY = controlPanel:WaitForChild("ButtonRotateY")
@@ -37,14 +35,15 @@ local buttonRotateZ = controlPanel:WaitForChild("ButtonRotateZ")
 -- 設定
 local GRID_SIZE = 4
 
--- 状態管理
+-- 状態
 local isDragging = false
 local draggingBlockType = nil
 local ghostPart = nil
 
 local selectedBlock = nil
 local selectionBox = Instance.new("SelectionBox")
-selectionBox.Color3 = Color3.fromRGB(255, 170, 0)
+-- パレットのSelectionカラーを使用
+selectionBox.Color3 = Palette.System.Selection
 selectionBox.LineThickness = 0.05
 selectionBox.Parent = playerGui
 
@@ -81,7 +80,8 @@ local function createGhost(blockType)
 		part.CanCollide = false
 		part.CastShadow = false
 		part.Material = Enum.Material.ForceField
-		part.Color = Color3.fromRGB(0, 255, 0)
+		-- パレットから色を取得して適用
+		part.Color = Palette.BlockColors[blockType] or Palette.System.Ghost
 		part.Anchored = true
 		part.Parent = workspace
 
@@ -186,7 +186,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local target = mouse.Target
 		local clickedBlock = false
-		-- PlacedBlock_で始まる名前のパーツかどうか判定
 		if target and target.Name:match("^PlacedBlock_") then
 			clickedBlock = true
 		end
@@ -198,4 +197,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
-print("Placement Controller Fixed (Mouse Added)")
+print("Placement Controller with Palette Loaded")
