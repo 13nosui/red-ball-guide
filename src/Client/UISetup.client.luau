@@ -54,10 +54,8 @@ editFrame.Size = UDim2.new(1, 0, 1, 0)
 editFrame.BackgroundTransparency = 1
 editFrame.Parent = screenGui
 
--- ★修正: 明るい背景に対応した Glass Style
-local function applyGlassStyle(guiObject, cornerRadius)
-	guiObject.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	guiObject.BackgroundTransparency = 0.65 -- ガラス感
+-- ポップスタイル (不透明・太い縁取り)
+local function applyPopStyle(guiObject, cornerRadius, isContainer)
 	guiObject.BorderSizePixel = 0
 
 	local corner = guiObject:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
@@ -65,64 +63,62 @@ local function applyGlassStyle(guiObject, cornerRadius)
 	corner.Parent = guiObject
 
 	local stroke = guiObject:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke")
-	-- 【変更点】白から「濃いグレー(ネイビー寄り)」に変更して、明るい床でも見えるようにする
-	stroke.Color = Color3.fromRGB(60, 60, 80)
-	stroke.Transparency = 0.6 -- 薄くして影っぽく見せる
-	stroke.Thickness = 2 -- 少し太くして視認性アップ
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Parent = guiObject
 
-	local originalTransparency = guiObject.BackgroundTransparency
+	if isContainer then
+		guiObject.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+		guiObject.BackgroundTransparency = 0.4
+		stroke.Thickness = 0
+		stroke.Transparency = 1
+	else
+		-- ボタン用
+		guiObject.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		guiObject.BackgroundTransparency = 0
 
-	if guiObject:IsA("GuiButton") then
-		guiObject.MouseEnter:Connect(function()
-			-- ホバー時は少し「濃く」して反応を示す (背景が白いため)
-			TweenService:Create(guiObject, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
-				BackgroundTransparency = 0.3, -- 透明度を下げて白を強調
-				BackgroundColor3 = Color3.fromRGB(240, 245, 255), -- ほんのり青白く
-			}):Play()
-			-- 枠線を濃くする
-			TweenService:Create(stroke, TweenInfo.new(0.3), {
-				Transparency = 0.3,
-				Color = Color3.fromRGB(40, 40, 60),
-			}):Play()
-		end)
+		stroke.Color = Color3.fromRGB(40, 40, 60)
+		stroke.Thickness = 3
+		stroke.Transparency = 0
 
-		guiObject.MouseLeave:Connect(function()
-			TweenService:Create(guiObject, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
-				BackgroundTransparency = originalTransparency,
-				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-			}):Play()
-			-- 枠線を元に戻す
-			TweenService:Create(stroke, TweenInfo.new(0.3), {
-				Transparency = 0.6,
-				Color = Color3.fromRGB(60, 60, 80),
-			}):Play()
-		end)
+		if guiObject:IsA("GuiButton") then
+			local originalColor = guiObject.BackgroundColor3
+			guiObject.MouseEnter:Connect(function()
+				TweenService:Create(guiObject, TweenInfo.new(0.2), { Size = guiObject.Size + UDim2.new(0, 4, 0, 4) })
+					:Play()
+			end)
+			guiObject.MouseLeave:Connect(function()
+				TweenService:Create(guiObject, TweenInfo.new(0.2), { Size = guiObject.Size - UDim2.new(0, 0, 0, 0) })
+					:Play()
+				TweenService:Create(guiObject, TweenInfo.new(0.2), { BackgroundColor3 = originalColor }):Play()
+			end)
+		end
 	end
 end
 
+-- ★修正: Next Stage ボタン
 local btnNext = Instance.new("TextButton")
 btnNext.Name = "ButtonNext"
 btnNext.Size = UDim2.new(0, 200, 0, 60)
 btnNext.Position = UDim2.new(0.5, 0, 0.6, 0)
 btnNext.AnchorPoint = Vector2.new(0.5, 0.5)
 btnNext.Text = "Next Stage"
-btnNext.TextColor3 = Color3.new(1, 1, 1)
+-- 文字色を濃い色にして視認性を確保
+btnNext.TextColor3 = Color3.fromRGB(40, 40, 60)
 btnNext.Font = Enum.Font.FredokaOne
 btnNext.TextSize = 24
 btnNext.TextTransparency = 1
 btnNext.Parent = resultFrame
-applyGlassStyle(btnNext, 30)
-btnNext.BackgroundColor3 = Palette.System.Success
-btnNext.BackgroundTransparency = 1
+applyPopStyle(btnNext, 30)
+-- 背景色を白に固定 (緑ではなく白ベースのポップスタイルに統一)
+btnNext.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+btnNext.BackgroundTransparency = 1 -- 初期は透明
 
 local drawerFrame = Instance.new("Frame")
 drawerFrame.Name = "DrawerMenu"
 drawerFrame.Size = UDim2.new(0, 100, 0.7, 0)
 drawerFrame.Position = UDim2.new(0, 20, 0.15, 0)
-drawerFrame.BackgroundTransparency = 1
 drawerFrame.Parent = editFrame
+applyPopStyle(drawerFrame, 20, true)
 
 local drawerLayout = Instance.new("UIListLayout")
 drawerLayout.Padding = UDim.new(0, 20)
@@ -135,7 +131,8 @@ local function create3DButton(name, blockType, parent)
 	btn.Name = name
 	btn.Size = UDim2.new(0, 70, 0, 70)
 	btn.Parent = parent
-	applyGlassStyle(btn, 20)
+	applyPopStyle(btn, 20)
+
 	local viewport = Instance.new("ViewportFrame")
 	viewport.Size = UDim2.new(0.8, 0, 0.8, 0)
 	viewport.Position = UDim2.new(0.1, 0, 0.1, 0)
@@ -213,7 +210,7 @@ controlPanel.Size = UDim2.new(0, 0, 0, 80)
 controlPanel.AnchorPoint = Vector2.new(0.5, 1)
 controlPanel.Position = UDim2.new(0.5, 0, 0.95, 0)
 controlPanel.Parent = editFrame
-applyGlassStyle(controlPanel, 40)
+applyPopStyle(controlPanel, 40, true)
 
 local controlPadding = Instance.new("UIPadding")
 controlPadding.PaddingTop = UDim.new(0, 15)
@@ -241,9 +238,9 @@ local function createTextButton(name, text, parent, color, size, layoutOrder)
 	btn.TextSize = 16
 	btn.LayoutOrder = layoutOrder or 0
 	btn.Parent = parent
-	applyGlassStyle(btn, 25)
+	applyPopStyle(btn, 25)
 	btn.BackgroundColor3 = color
-	btn.BackgroundTransparency = 0.5
+	btn.BackgroundTransparency = 0
 	return btn
 end
 
@@ -265,7 +262,8 @@ headerFrame.Size = UDim2.new(0, 180, 0, 50)
 headerFrame.Position = UDim2.new(0.5, 0, 0.08, 0)
 headerFrame.AnchorPoint = Vector2.new(0.5, 0)
 headerFrame.Parent = editFrame
-applyGlassStyle(headerFrame, 25)
+applyPopStyle(headerFrame, 25, true)
+
 local stageLabel = Instance.new("TextLabel")
 stageLabel.Name = "StageLabel"
 stageLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -283,7 +281,7 @@ actionPanel.Size = UDim2.new(0, 0, 0, 80)
 actionPanel.AnchorPoint = Vector2.new(1, 1)
 actionPanel.Position = UDim2.new(0.95, 0, 0.95, 0)
 actionPanel.Parent = editFrame
-applyGlassStyle(actionPanel, 40)
+applyPopStyle(actionPanel, 40, true)
 
 local actionPadding = Instance.new("UIPadding")
 actionPadding.PaddingTop = UDim.new(0, 15)
@@ -380,7 +378,8 @@ StageClearEvent.OnClientEvent:Connect(function(stageIndex)
 	btnNext.BackgroundTransparency = 1
 	btnNext.TextTransparency = 1
 	task.wait(0.5)
-	local t2 = TweenService:Create(btnNext, TweenInfo.new(0.5), { BackgroundTransparency = 0.5, TextTransparency = 0 })
+	-- ★修正: 出現時は完全に不透明(0)にする
+	local t2 = TweenService:Create(btnNext, TweenInfo.new(0.5), { BackgroundTransparency = 0, TextTransparency = 0 })
 	t2:Play()
 	spawnConfetti()
 end)
@@ -396,4 +395,4 @@ UpdateStageEvent.OnClientEvent:Connect(function(index, data)
 	stageLabel.Text = "STAGE: " .. string.format("%02d", index)
 end)
 
-print("UI Setup: Fixed UI Visibility for Bright Backgrounds")
+print("UI Setup: Button Visibility Fixed")
