@@ -18,11 +18,9 @@ local GOAL_WIDTH = 12
 local MAGNET_RADIUS = HOLE_SIZE * 2.5
 local MAX_CAPTURE_SPEED = 60
 
--- ★AIアシスト設定 (修正: より自然な挙動へ)
+-- ★AIアシスト設定
 local AI_ASSIST_RANGE = 8
--- 修正: 補正力を大幅に下げる (20 -> 4) : 風のような微調整レベルにする
 local AI_CORRECTION_POWER = 4
--- 修正: 自動推進力を削除 (10 -> 0) : 重力のみで転がらせる
 local AI_PROPULSION_POWER = 0
 
 -- ■ ステージデータ
@@ -42,7 +40,8 @@ local STAGE_DATA = {
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20), Vector3.new(20, 2, -20) },
 		Fans = {},
 		TutorialBlocks = {
-			{ Type = "Block", Position = Vector3.new(0, 2, -20), Rotation = Vector3.new(0, 45, 0) },
+			-- ★修正: ブロック位置を奥(-2, -22)にずらし、ボールがZ=-20まで進めるようにする
+			{ Type = "Block", Position = Vector3.new(-2, 2, -22), Rotation = Vector3.new(0, 45, 0) },
 		},
 	},
 	[3] = {
@@ -134,7 +133,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	-- 2. AI Navigation Assist (弱めた補正)
+	-- 2. AI Navigation Assist
 	local data = STAGE_DATA[currentStageIndex]
 	if data and data.Waypoints and #data.Waypoints >= 2 then
 		local ballPos = currentBall.Position
@@ -160,12 +159,8 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 
 		if closestDist < AI_ASSIST_RANGE and targetPoint then
-			-- 修正: 推進力をゼロにし、補正力も弱めることで自然な転がりを優先
 			local correctionVec = (targetPoint - ballPos) * AI_CORRECTION_POWER * dt
-
-			-- 補正は水平方向のみに限定し、落下の邪魔をしない
 			correctionVec = Vector3.new(correctionVec.X, 0, correctionVec.Z)
-
 			currentBall.AssemblyLinearVelocity = currentBall.AssemblyLinearVelocity + correctionVec
 		end
 	end
@@ -518,4 +513,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Natural Physics with Slight Assist")
+print("GameManager Updated: Corrected Guide Block Position for Stage 2")
