@@ -361,78 +361,8 @@ clearUserBlocks = function()
 	end
 end
 
-local function createFloorWithGap(gapPosition, gapSize)
-	local baseplate = workspace:FindFirstChild("Baseplate")
-	if baseplate then
-		baseplate:Destroy()
-	end
-	local oldFloor = workspace:FindFirstChild("GeneratedFloor")
-	if oldFloor then
-		oldFloor:Destroy()
-	end
-
-	local floorModel = Instance.new("Model")
-	floorModel.Name = "GeneratedFloor"
-	local WORLD_SIZE = 2048
-	local FLOOR_THICKNESS = 4
-	local Y_POS = -2
-
-	local function addGridTexture(part)
-		local texture = Instance.new("Texture")
-		texture.Face = Enum.NormalId.Top
-		texture.Texture = "rbxassetid://6372755229"
-		texture.Color3 = Color3.fromRGB(255, 255, 255)
-		texture.Transparency = 0.8
-		texture.StudsPerTileU = 4
-		texture.StudsPerTileV = 4
-		local cornerX = part.Position.X - part.Size.X / 2
-		local cornerZ = part.Position.Z - part.Size.Z / 2
-		texture.OffsetStudsU = cornerX % 4
-		texture.OffsetStudsV = cornerZ % 4
-		texture.Parent = part
-	end
-
-	local gx, gz = gapPosition.X, gapPosition.Z
-	local gw, gd = gapSize.X, gapSize.Z
-	local function makeFloor(name, size, pos)
-		local p = Instance.new("Part")
-		p.Name = name
-		p.Size = size
-		p.Position = pos
-		p.Anchored = true
-		p.Color = Color3.fromRGB(15, 15, 20)
-		p.Material = Enum.Material.SmoothPlastic
-		addGridTexture(p)
-		p.Parent = floorModel
-	end
-
-	local northSizeZ = (WORLD_SIZE / 2) - (math.abs(gz) + gd / 2)
-	if northSizeZ > 0 then
-		makeFloor(
-			"FloorNorth",
-			Vector3.new(WORLD_SIZE, FLOOR_THICKNESS, northSizeZ),
-			Vector3.new(0, Y_POS, (gz - gd / 2) - northSizeZ / 2)
-		)
-	end
-	local southStart = gz + gd / 2
-	local sSizeZ = (WORLD_SIZE / 2) - southStart
-	makeFloor(
-		"FloorSouth",
-		Vector3.new(WORLD_SIZE, FLOOR_THICKNESS, sSizeZ),
-		Vector3.new(0, Y_POS, southStart + sSizeZ / 2)
-	)
-	local westEnd = gx - gw / 2
-	local wSizeX = westEnd - (-WORLD_SIZE / 2)
-	makeFloor(
-		"FloorWest",
-		Vector3.new(wSizeX, FLOOR_THICKNESS, gd),
-		Vector3.new((-WORLD_SIZE / 2) + wSizeX / 2, Y_POS, gz)
-	)
-	local eastStart = gx + gw / 2
-	local eSizeX = (WORLD_SIZE / 2) - eastStart
-	makeFloor("FloorEast", Vector3.new(eSizeX, FLOOR_THICKNESS, gd), Vector3.new(eastStart + eSizeX / 2, Y_POS, gz))
-	floorModel.Parent = workspace
-end
+-- 床の穴あけ関数は不要になったので削除
+-- local function createFloorWithGap...
 
 spawnBall = function()
 	if currentBall then
@@ -453,7 +383,7 @@ spawnBall = function()
 	return ball
 end
 
--- ■ ゴール生成 (修正版: 4つのパーツで枠を作る)
+-- ■ ゴール生成 (修正版: CSGを使って丸い穴を開ける)
 local function spawnGoal()
 	local existingGoal = workspace:FindFirstChild("GoalModel")
 	if existingGoal then
@@ -463,69 +393,86 @@ local function spawnGoal()
 	model.Name = "GoalModel"
 	model.Parent = workspace
 
-	-- 地面の穴あけ
-	createFloorWithGap(currentGoalPos, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
+	-- 1. 土台となる四角いパーツを作成
+	local basePart = Instance.new("Part")
+	basePart.Name = "GoalBase"
+	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH)
+	basePart.CFrame = CFrame.new(currentGoalPos)
+	basePart.Color = Palette.Entity.GoalBase
+	basePart.Material = Enum.Material.Grass
+	basePart.Anchored = true
+	basePart.Parent = workspace -- 一旦workspaceに置く
 
-	-- ★修正: Unionを使わず、4つのパーツで四角い穴を作る
-	local halfWidth = GOAL_WIDTH / 2
-	local halfHole = HOLE_SIZE / 2
-	local stripWidth = halfWidth - halfHole -- 枠の幅
-	local zOffset = halfHole + (stripWidth / 2)
-	local xOffset = halfHole + (stripWidth / 2)
+	-- 2. 穴を開けるための円柱パーツを作成 (Cutter)
+	local holeCutter = Instance.new("Part")
+	holeCutter.Name = "Cutter"
+	holeCutter.Shape = Enum.PartType.Cylinder
+	-- 円柱を立てるために90度回転させる
+	holeCutter.CFrame = basePart.CFrame * CFrame.Angles(0, 0, math.rad(90))
+	-- 直径をHOLE_SIZEに、高さは土台より少し高くして貫通させる
+	holeCutter.Size = Vector3.new(GOAL_THICKNESS * 2, HOLE_SIZE, HOLE_SIZE)
+	holeCutter.Parent = workspace
 
-	local function createStrip(size, offset)
-		local part = Instance.new("Part")
-		part.Name = "GoalFramePart"
-		part.Size = size
-		part.CFrame = CFrame.new(currentGoalPos) * offset
-		part.Color = Palette.Entity.GoalBase
-		part.Material = Enum.Material.Grass
-		part.Anchored = true
-		part.Parent = model
-	end
-
-	-- 上下の枠 (全幅)
-	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, -zOffset))
-	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, zOffset))
-
-	-- 左右の枠 (隙間埋め)
-	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(-xOffset, 0, 0))
-	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(xOffset, 0, 0))
-
-	-- カップの底 (見た目)
-	local cupBottom = Instance.new("Part")
-	cupBottom.Name = "CupBottom"
-	cupBottom.Shape = Enum.PartType.Cylinder
-	cupBottom.Size = Vector3.new(0.2, HOLE_SIZE * 0.95, HOLE_SIZE * 0.95)
-	cupBottom.Color = Palette.Entity.GoalCup
-	cupBottom.Material = Enum.Material.Plastic
-	cupBottom.Anchored = true
-	cupBottom.CanCollide = true
-	-- 向き調整
-	cupBottom.CFrame = CFrame.new(currentGoalPos)
-		* CFrame.Angles(0, 0, math.rad(90))
-		* CFrame.new(-GOAL_THICKNESS / 2 + 0.2, 0, 0)
-	cupBottom.Parent = model
-
-	-- 判定用センサー
-	local magnet = Instance.new("Part")
-	magnet.Name = "MagnetSensor"
-	magnet.Shape = Enum.PartType.Cylinder
-	magnet.Size = Vector3.new(1, MAGNET_RADIUS, MAGNET_RADIUS)
-	magnet.CFrame = CFrame.new(currentGoalPos) * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(1, 0, 0)
-	magnet.Transparency = 1
-	magnet.CanCollide = false
-	magnet.Anchored = true
-	magnet.Parent = model
-	magnet.CanQuery = false
-	magnet.Touched:Connect(function(hit)
-		if isGoalLocked then
-			return
-		end
-		if hit.Name == "RedBall" and hit.AssemblyLinearVelocity.Magnitude < MAX_CAPTURE_SPEED then
-			captureBallIntoHole(hit, Vector3.new(currentGoalPos.X, 0, currentGoalPos.Z))
-		end
+	-- 3. CSG (SubtractAsync) を実行して穴を開ける
+	local success, result = pcall(function()
+		-- PreciseConvexDecomposition を使用して物理形状を正確にする
+		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.PreciseConvexDecomposition)
 	end)
+
+	if success and result then
+		-- 成功したら、生成されたユニオンパーツをモデルに入れる
+		local unionGoal = result
+		unionGoal.Name = "GoalCupFrame"
+		unionGoal.Anchored = true
+		unionGoal.Parent = model
+
+		-- 元のパーツとカッターを削除
+		basePart:Destroy()
+		holeCutter:Destroy()
+
+		-- 4. カップの底 (見た目)
+		local cupBottom = Instance.new("Part")
+		cupBottom.Name = "CupBottom"
+		cupBottom.Shape = Enum.PartType.Cylinder
+		-- 穴より少しだけ小さくする(チラつき防止)
+		cupBottom.Size = Vector3.new(0.2, HOLE_SIZE * 0.95, HOLE_SIZE * 0.95)
+		cupBottom.Color = Palette.Entity.GoalCup
+		cupBottom.Material = Enum.Material.Plastic
+		cupBottom.Anchored = true
+		cupBottom.CanCollide = true
+		-- 向き調整と配置
+		cupBottom.CFrame = unionGoal.CFrame
+			* CFrame.Angles(0, 0, math.rad(90))
+			* CFrame.new(-GOAL_THICKNESS / 2 + 0.2, 0, 0)
+		cupBottom.Parent = model
+
+		-- 5. 判定用センサー
+		local magnet = Instance.new("Part")
+		magnet.Name = "MagnetSensor"
+		magnet.Shape = Enum.PartType.Cylinder
+		magnet.Size = Vector3.new(1, MAGNET_RADIUS, MAGNET_RADIUS)
+		magnet.CFrame = unionGoal.CFrame * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(1, 0, 0)
+		magnet.Transparency = 1
+		magnet.CanCollide = false
+		magnet.Anchored = true
+		magnet.Parent = model
+		magnet.CanQuery = false
+		magnet.Touched:Connect(function(hit)
+			if isGoalLocked then
+				return
+			end
+			if hit.Name == "RedBall" and hit.AssemblyLinearVelocity.Magnitude < MAX_CAPTURE_SPEED then
+				captureBallIntoHole(hit, Vector3.new(currentGoalPos.X, 0, currentGoalPos.Z))
+			end
+		end)
+	else
+		-- CSG失敗時のフォールバック (念のため)
+		warn("Failed to create circular goal hole:", result)
+		basePart.Parent = model
+		if holeCutter then
+			holeCutter:Destroy()
+		end
+	end
 end
 
 loadStage = function(index)
@@ -591,4 +538,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Fixed Invisible Goal Bug")
+print("GameManager Updated: Goal Hole is now Circular using CSG")
