@@ -97,8 +97,6 @@ local function createGhost(blockType)
 		decal.Texture = "rbxassetid://7012896580"
 		decal.Face = Enum.NormalId.Right
 		decal.Parent = part
-
-	-- ★修正: 加速床ゴースト (SurfaceGuiで矢印を表示)
 	elseif blockType == "Conveyor" then
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Block
@@ -108,16 +106,17 @@ local function createGhost(blockType)
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = Enum.NormalId.Top
 		gui.CanvasSize = Vector2.new(200, 200)
+		-- ★修正: 光の影響を受けなくする（常に明るく表示）
+		gui.LightInfluence = 0
 		gui.Parent = part
 
 		local arrow = Instance.new("TextLabel")
 		arrow.Size = UDim2.fromScale(1, 1)
 		arrow.BackgroundTransparency = 1
-		arrow.Text = "⬆" -- 太い矢印
-		arrow.TextColor3 = Color3.new(0, 0, 0) -- 黒色で見やすく
+		arrow.Text = "⬆"
+		arrow.TextColor3 = Color3.new(0, 0, 0)
 		arrow.TextScaled = true
 		arrow.Font = Enum.Font.GothamBold
-		arrow.Rotation = 0 -- 上向き(Front方向)
 		arrow.Parent = gui
 	end
 
@@ -301,4 +300,4 @@ buttonDelete.MouseButton1Click:Connect(function()
 	requestUpdate("delete", nil)
 end)
 
-print("Placement Controller: Conveyor Arrow Visual Fixed")
+print("Placement Controller: Conveyor Ghost Fixed")

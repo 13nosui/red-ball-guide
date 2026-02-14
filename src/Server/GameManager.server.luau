@@ -286,7 +286,7 @@ local function spawnSpring(position, rotation)
 	model.Parent = folder
 end
 
--- ■ 加速床生成
+-- ■ 加速床生成 (★修正: LightInfluence = 0 を追加)
 local function spawnConveyor(position, rotation)
 	local model = Instance.new("Model")
 	model.Name = "PlacedBlock_Conveyor"
@@ -297,17 +297,33 @@ local function spawnConveyor(position, rotation)
 	pad.Color = Color3.fromRGB(255, 255, 100)
 	pad.Material = Enum.Material.Plastic
 	pad.Anchored = true
+
 	local baseCFrame = CFrame.new(position)
 	if typeof(rotation) == "Vector3" then
 		baseCFrame = baseCFrame * CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
 	end
 	pad.CFrame = baseCFrame
+
 	local SPEED = 40
 	pad.AssemblyLinearVelocity = pad.CFrame.LookVector * SPEED
-	local decal = Instance.new("Decal")
-	decal.Texture = "rbxassetid://6005741632"
-	decal.Face = Enum.NormalId.Top
-	decal.Parent = pad
+
+	-- 矢印表示
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Top
+	gui.CanvasSize = Vector2.new(200, 200)
+	-- ★修正: 光の影響を受けなくする
+	gui.LightInfluence = 0
+	gui.Parent = pad
+
+	local arrow = Instance.new("TextLabel")
+	arrow.Size = UDim2.fromScale(1, 1)
+	arrow.BackgroundTransparency = 1
+	arrow.Text = "⬆"
+	arrow.TextColor3 = Color3.new(0, 0, 0)
+	arrow.TextScaled = true
+	arrow.Font = Enum.Font.GothamBold
+	arrow.Parent = gui
+
 	pad.Parent = model
 	model.PrimaryPart = pad
 	local folder = workspace:FindFirstChild("PlacedBlocks") or Instance.new("Folder", workspace)
@@ -437,7 +453,7 @@ clearUserBlocks = function()
 	end
 end
 
--- ★復活: 床に四角い穴を開ける関数 (4つのパーツで生成)
+-- 床の四角い穴あけ
 local function createFloorWithGap(gapPosition, gapSize)
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if baseplate then
@@ -530,7 +546,7 @@ spawnBall = function()
 	return ball
 end
 
--- ■ ゴール生成 (4分割で四角い枠を作成 + 四角い底)
+-- ■ ゴール生成 (四角い枠)
 local function spawnGoal()
 	local existingGoal = workspace:FindFirstChild("GoalModel")
 	if existingGoal then
@@ -540,10 +556,8 @@ local function spawnGoal()
 	model.Name = "GoalModel"
 	model.Parent = workspace
 
-	-- 1. 床に四角い穴を開ける
 	createFloorWithGap(currentGoalPos, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
 
-	-- 2. 四角い枠を作る (4つのパーツを配置)
 	local halfWidth = GOAL_WIDTH / 2
 	local halfHole = HOLE_SIZE / 2
 	local stripWidth = halfWidth - halfHole
@@ -560,19 +574,15 @@ local function spawnGoal()
 		part.Anchored = true
 		part.Parent = model
 	end
-
-	-- 上下
 	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, -zOffset))
 	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, zOffset))
-	-- 左右 (隙間埋め)
 	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(-xOffset, 0, 0))
 	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(xOffset, 0, 0))
 
-	-- 3. ★修正: カップの底を四角形(Block)に変更してフィットさせる
 	local cupBottom = Instance.new("Part")
 	cupBottom.Name = "CupBottom"
-	cupBottom.Shape = Enum.PartType.Block -- Blockに変更
-	cupBottom.Size = Vector3.new(HOLE_SIZE * 0.95, 0.2, HOLE_SIZE * 0.95) -- 正方形
+	cupBottom.Shape = Enum.PartType.Block
+	cupBottom.Size = Vector3.new(HOLE_SIZE * 0.95, 0.2, HOLE_SIZE * 0.95)
 	cupBottom.Color = Palette.Entity.GoalCup
 	cupBottom.Material = Enum.Material.Plastic
 	cupBottom.Anchored = true
@@ -580,7 +590,6 @@ local function spawnGoal()
 	cupBottom.CFrame = CFrame.new(currentGoalPos) * CFrame.new(0, -GOAL_THICKNESS / 2 + 0.1, 0)
 	cupBottom.Parent = model
 
-	-- 4. 判定用センサー (円柱のままでOK)
 	local magnet = Instance.new("Part")
 	magnet.Name = "MagnetSensor"
 	magnet.Shape = Enum.PartType.Cylinder
@@ -664,4 +673,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Stable Square Goal and Cup Bottom")
+print("GameManager Updated: Conveyor Arrow Visibility Fixed")
