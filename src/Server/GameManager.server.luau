@@ -12,6 +12,14 @@ local UpdateStageEvent = require(Events.UpdateStageEvent)
 local PlaceBlockEvent = require(Events:WaitForChild("PlaceBlockEvent"))
 local UpdateBlockEvent = require(Events:WaitForChild("UpdateBlockEvent"))
 
+-- ★追加: ステージクリア通知用イベントを動的生成（なければ作る）
+local StageClearEvent = Events:FindFirstChild("StageClearEvent")
+if not StageClearEvent then
+	StageClearEvent = Instance.new("RemoteEvent")
+	StageClearEvent.Name = "StageClearEvent"
+	StageClearEvent.Parent = Events
+end
+
 -- 設定
 local BALL_SIZE = 4
 local HOLE_SIZE = 5.5
@@ -107,7 +115,6 @@ RunService.Heartbeat:Connect(function(dt)
 		local zonePart = zoneData.Part
 		local direction = zonePart.CFrame.LookVector
 		local power = zoneData.Power or 60
-
 		local relPos = zonePart.CFrame:PointToObjectSpace(currentBall.Position)
 		local size = zonePart.Size
 		if
@@ -126,7 +133,6 @@ RunService.Heartbeat:Connect(function(dt)
 		local closestDist = math.huge
 		local targetPoint = nil
 		local targetDir = nil
-
 		for i = 1, #data.Waypoints - 1 do
 			local p1 = data.Waypoints[i]
 			local p2 = data.Waypoints[i + 1]
@@ -140,12 +146,10 @@ RunService.Heartbeat:Connect(function(dt)
 				targetDir = (p2 - p1).Unit
 			end
 		end
-
 		if closestDist < AI_ASSIST_RANGE and targetPoint then
 			local correctionVec = (targetPoint - ballPos) * AI_CORRECTION_POWER * dt
 			correctionVec = Vector3.new(correctionVec.X, 0, correctionVec.Z)
 			currentBall.AssemblyLinearVelocity = currentBall.AssemblyLinearVelocity + correctionVec
-
 			local speed =
 				Vector3.new(currentBall.AssemblyLinearVelocity.X, 0, currentBall.AssemblyLinearVelocity.Z).Magnitude
 			if speed < AI_MIN_SPEED and targetDir then
@@ -178,7 +182,6 @@ local function spawnFan(position, rotation, isUserBlock)
 	else
 		baseCFrame = baseCFrame * CFrame.Angles(0, math.rad(90), 0)
 	end
-
 	housing.CFrame = baseCFrame * CFrame.Angles(0, math.rad(90), 0)
 	housing.Parent = model
 
@@ -196,12 +199,10 @@ local function spawnFan(position, rotation, isUserBlock)
 	local blades2 = blades:Clone()
 	blades2.CFrame = housing.CFrame * CFrame.Angles(math.rad(90), 0, 0)
 	blades2.Parent = model
-
 	task.spawn(function()
 		while blades.Parent do
-			local rot = CFrame.Angles(math.rad(15), 0, 0)
-			blades.CFrame = blades.CFrame * rot
-			blades2.CFrame = blades2.CFrame * rot
+			blades.CFrame = blades.CFrame * CFrame.Angles(math.rad(15), 0, 0)
+			blades2.CFrame = blades2.CFrame * CFrame.Angles(math.rad(15), 0, 0)
 			task.wait(0.01)
 		end
 	end)
@@ -238,7 +239,6 @@ local function spawnFan(position, rotation, isUserBlock)
 	else
 		model.Parent = workspace
 	end
-
 	table.insert(activeWindZones, { Part = zone, Power = 60 })
 	return model
 end
@@ -286,7 +286,7 @@ local function spawnSpring(position, rotation)
 	model.Parent = folder
 end
 
--- ■ 加速床生成 (★修正: LightInfluence = 0 を追加)
+-- ■ 加速床生成
 local function spawnConveyor(position, rotation)
 	local model = Instance.new("Model")
 	model.Name = "PlacedBlock_Conveyor"
@@ -297,24 +297,18 @@ local function spawnConveyor(position, rotation)
 	pad.Color = Color3.fromRGB(255, 255, 100)
 	pad.Material = Enum.Material.Plastic
 	pad.Anchored = true
-
 	local baseCFrame = CFrame.new(position)
 	if typeof(rotation) == "Vector3" then
 		baseCFrame = baseCFrame * CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
 	end
 	pad.CFrame = baseCFrame
-
 	local SPEED = 40
 	pad.AssemblyLinearVelocity = pad.CFrame.LookVector * SPEED
-
-	-- 矢印表示
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Top
 	gui.CanvasSize = Vector2.new(200, 200)
-	-- ★修正: 光の影響を受けなくする
 	gui.LightInfluence = 0
 	gui.Parent = pad
-
 	local arrow = Instance.new("TextLabel")
 	arrow.Size = UDim2.fromScale(1, 1)
 	arrow.BackgroundTransparency = 1
@@ -323,7 +317,6 @@ local function spawnConveyor(position, rotation)
 	arrow.TextScaled = true
 	arrow.Font = Enum.Font.GothamBold
 	arrow.Parent = gui
-
 	pad.Parent = model
 	model.PrimaryPart = pad
 	local folder = workspace:FindFirstChild("PlacedBlocks") or Instance.new("Folder", workspace)
@@ -333,7 +326,6 @@ end
 
 -- ■ ブロック配置処理
 PlaceBlockEvent.OnServerEvent:Connect(function(player, blockType, position, rotation)
-	print("Placing:", blockType)
 	if blockType == "Fan" then
 		spawnFan(position, rotation, true)
 		return
@@ -416,7 +408,7 @@ UpdateBlockEvent.OnServerEvent:Connect(function(player, block, action, value)
 	UpdateBlockEvent:FireAllClients(target)
 end)
 
--- ■ ゴール吸い込み
+-- ■ ゴール吸い込み (★修正: 自動遷移を廃止し、クライアントへクリア通知)
 local function captureBallIntoHole(ball, cupCenterPosition)
 	if isGoalLocked then
 		return
@@ -426,6 +418,7 @@ local function captureBallIntoHole(ball, cupCenterPosition)
 	ball.CanCollide = false
 	ball.AssemblyLinearVelocity = Vector3.zero
 	print("✨ AI Assist: Capturing ball into goal...")
+
 	local overHolePos = Vector3.new(cupCenterPosition.X, ball.Position.Y, cupCenterPosition.Z)
 	TweenService
 		:Create(ball, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = overHolePos })
@@ -436,14 +429,13 @@ local function captureBallIntoHole(ball, cupCenterPosition)
 		:Create(ball, TweenInfo.new(0.4, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), { Position = bottomPos })
 		:Play()
 	task.wait(0.4)
-	print("🎉 GOAL! Stage " .. currentStageIndex .. " Cleared!")
-	task.wait(1.5)
-	currentStageIndex = currentStageIndex + 1
-	if currentStageIndex > #STAGE_DATA then
-		currentStageIndex = 1
-		print("Loop back to 1.")
-	end
-	loadStage(currentStageIndex)
+
+	print("🎉 GOAL! Waiting for player to proceed...")
+
+	-- ★追加: クライアントにステージクリアを通知
+	StageClearEvent:FireAllClients(currentStageIndex)
+
+	-- ここでの loadStage 自動呼び出しは削除
 end
 
 clearUserBlocks = function()
@@ -453,7 +445,6 @@ clearUserBlocks = function()
 	end
 end
 
--- 床の四角い穴あけ
 local function createFloorWithGap(gapPosition, gapSize)
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if baseplate then
@@ -463,13 +454,11 @@ local function createFloorWithGap(gapPosition, gapSize)
 	if oldFloor then
 		oldFloor:Destroy()
 	end
-
 	local floorModel = Instance.new("Model")
 	floorModel.Name = "GeneratedFloor"
 	local WORLD_SIZE = 2048
 	local FLOOR_THICKNESS = 4
 	local Y_POS = -2
-
 	local function addGridTexture(part)
 		local texture = Instance.new("Texture")
 		texture.Face = Enum.NormalId.Top
@@ -484,7 +473,6 @@ local function createFloorWithGap(gapPosition, gapSize)
 		texture.OffsetStudsV = cornerZ % 4
 		texture.Parent = part
 	end
-
 	local gx, gz = gapPosition.X, gapPosition.Z
 	local gw, gd = gapSize.X, gapSize.Z
 	local function makeFloor(name, size, pos)
@@ -498,7 +486,6 @@ local function createFloorWithGap(gapPosition, gapSize)
 		addGridTexture(p)
 		p.Parent = floorModel
 	end
-
 	local northSizeZ = (WORLD_SIZE / 2) - (math.abs(gz) + gd / 2)
 	if northSizeZ > 0 then
 		makeFloor(
@@ -555,15 +542,12 @@ local function spawnGoal()
 	local model = Instance.new("Model")
 	model.Name = "GoalModel"
 	model.Parent = workspace
-
 	createFloorWithGap(currentGoalPos, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
-
 	local halfWidth = GOAL_WIDTH / 2
 	local halfHole = HOLE_SIZE / 2
 	local stripWidth = halfWidth - halfHole
 	local zOffset = halfHole + (stripWidth / 2)
 	local xOffset = halfHole + (stripWidth / 2)
-
 	local function createStrip(size, offset)
 		local part = Instance.new("Part")
 		part.Name = "GoalFramePart"
@@ -578,7 +562,6 @@ local function spawnGoal()
 	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, zOffset))
 	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(-xOffset, 0, 0))
 	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(xOffset, 0, 0))
-
 	local cupBottom = Instance.new("Part")
 	cupBottom.Name = "CupBottom"
 	cupBottom.Shape = Enum.PartType.Block
@@ -589,7 +572,6 @@ local function spawnGoal()
 	cupBottom.CanCollide = true
 	cupBottom.CFrame = CFrame.new(currentGoalPos) * CFrame.new(0, -GOAL_THICKNESS / 2 + 0.1, 0)
 	cupBottom.Parent = model
-
 	local magnet = Instance.new("Part")
 	magnet.Name = "MagnetSensor"
 	magnet.Shape = Enum.PartType.Cylinder
@@ -619,7 +601,6 @@ loadStage = function(index)
 		end
 	end
 	activeWindZones = {}
-
 	local data = STAGE_DATA[index]
 	if data then
 		currentStartPos = data.Start
@@ -665,12 +646,19 @@ end)
 task.wait(1)
 loadStage(1)
 
+-- ★修正: イベントハンドリング (next処理追加)
 GameControlEvent.OnServerEvent:Connect(function(player, action)
 	if action == "start" then
 		startGame()
 	elseif action == "reset" then
 		resetGame()
+	elseif action == "next" then -- 次のステージへ
+		currentStageIndex = currentStageIndex + 1
+		if currentStageIndex > #STAGE_DATA then
+			currentStageIndex = 1
+		end
+		loadStage(currentStageIndex)
 	end
 end)
 
-print("GameManager Updated: Conveyor Arrow Visibility Fixed")
+print("GameManager Updated: Stage Clear Event & Manual Transition")

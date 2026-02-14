@@ -2,10 +2,17 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService") -- 追加
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Events = Shared:WaitForChild("Events")
+local GameControlEvent = require(Events:WaitForChild("GameControlEvent"))
+local UpdateStageEvent = require(Events:WaitForChild("UpdateStageEvent"))
+-- ★追加: 動的に作られるイベントを待つ
+local StageClearEvent = Events:WaitForChild("StageClearEvent")
+
 local Palette = require(Shared:WaitForChild("Palette"))
 
 local screenGui = Instance.new("ScreenGui")
@@ -14,6 +21,35 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
+-- ★追加: 結果表示用フレーム (全画面)
+local resultFrame = Instance.new("Frame")
+resultFrame.Name = "ResultFrame"
+resultFrame.Size = UDim2.new(1, 0, 1, 0)
+resultFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+resultFrame.BackgroundTransparency = 1 -- 初期は透明
+resultFrame.Visible = false
+resultFrame.ZIndex = 100
+resultFrame.Parent = screenGui
+
+local confettiContainer = Instance.new("Frame")
+confettiContainer.Name = "ConfettiContainer"
+confettiContainer.Size = UDim2.new(1, 0, 1, 0)
+confettiContainer.BackgroundTransparency = 1
+confettiContainer.Parent = resultFrame
+
+local clearLabel = Instance.new("TextLabel")
+clearLabel.Name = "Title"
+clearLabel.Text = "STAGE CLEAR!"
+clearLabel.Size = UDim2.new(1, 0, 0.2, 0)
+clearLabel.Position = UDim2.new(0, 0, 0.3, 0)
+clearLabel.BackgroundTransparency = 1
+clearLabel.TextColor3 = Color3.new(1, 1, 1)
+clearLabel.Font = Enum.Font.GothamBlack
+clearLabel.TextSize = 60
+clearLabel.TextTransparency = 1
+clearLabel.Parent = resultFrame
+
+-- 既存の編集用フレーム
 local editFrame = Instance.new("Frame")
 editFrame.Name = "EditFrame"
 editFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -54,6 +90,22 @@ local function applyGlassStyle(guiObject, cornerRadius)
 		end)
 	end
 end
+
+-- ★追加: 次のステージへボタン
+local btnNext = Instance.new("TextButton")
+btnNext.Name = "ButtonNext"
+btnNext.Size = UDim2.new(0, 200, 0, 60)
+btnNext.Position = UDim2.new(0.5, 0, 0.6, 0)
+btnNext.AnchorPoint = Vector2.new(0.5, 0.5)
+btnNext.Text = "Next Stage"
+btnNext.TextColor3 = Color3.new(1, 1, 1)
+btnNext.Font = Enum.Font.GothamBold
+btnNext.TextSize = 24
+btnNext.TextTransparency = 1
+btnNext.Parent = resultFrame
+applyGlassStyle(btnNext, 30)
+btnNext.BackgroundColor3 = Palette.System.Success
+btnNext.BackgroundTransparency = 1 -- 初期は消す
 
 -- 1. ドロワーメニュー
 local drawerFrame = Instance.new("Frame")
@@ -96,13 +148,11 @@ local function create3DButton(name, blockType, parent)
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Cylinder
 		part.CFrame = CFrame.Angles(0, math.rad(90), 0)
-	-- ★追加: ジャンプ台 (平たい円柱)
 	elseif blockType == "Spring" then
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Cylinder
-		part.Size = Vector3.new(0.5, 4, 4) -- 高さ低め
-		part.CFrame = CFrame.Angles(0, 0, math.rad(90)) -- 縦向き
-	-- ★追加: 加速床 (平たいブロック)
+		part.Size = Vector3.new(0.5, 4, 4)
+		part.CFrame = CFrame.Angles(0, 0, math.rad(90))
 	elseif blockType == "Conveyor" then
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Block
@@ -115,10 +165,10 @@ local function create3DButton(name, blockType, parent)
 			part.Color = Palette.Entity.FanHousing or Color3.new(0.5, 0.5, 0.5)
 			part.Size = Vector3.new(2, 6, 6)
 		elseif blockType == "Spring" then
-			part.Color = Color3.fromRGB(255, 100, 100) -- 赤
+			part.Color = Color3.fromRGB(255, 100, 100)
 			part.Size = Vector3.new(1, 4, 4)
 		elseif blockType == "Conveyor" then
-			part.Color = Color3.fromRGB(255, 255, 100) -- 黄色
+			part.Color = Color3.fromRGB(255, 255, 100)
 			part.Size = Vector3.new(4, 1, 4)
 		else
 			part.Color = Palette.BlockColors[blockType] or Color3.new(1, 1, 1)
@@ -128,11 +178,9 @@ local function create3DButton(name, blockType, parent)
 		part.Anchored = true
 		part.Position = Vector3.new(0, 0, 0)
 		part.Parent = viewport
-
 		camera.CFrame = CFrame.new(Vector3.new(6, 5, 6), part.Position)
 		viewport.CurrentCamera = camera
 		camera.Parent = viewport
-
 		task.spawn(function()
 			local t = 0
 			while part.Parent do
@@ -145,13 +193,12 @@ local function create3DButton(name, blockType, parent)
 	return btn
 end
 
--- ボタン生成順序
 local btnBlock = create3DButton("ButtonBlock", "Block", drawerFrame)
 local btnSphere = create3DButton("ButtonSphere", "Sphere", drawerFrame)
 local btnWedge = create3DButton("ButtonWedge", "Wedge", drawerFrame)
 local btnFan = create3DButton("ButtonFan", "Fan", drawerFrame)
-local btnSpring = create3DButton("ButtonSpring", "Spring", drawerFrame) -- ★追加
-local btnConveyor = create3DButton("ButtonConveyor", "Conveyor", drawerFrame) -- ★追加
+local btnSpring = create3DButton("ButtonSpring", "Spring", drawerFrame)
+local btnConveyor = create3DButton("ButtonConveyor", "Conveyor", drawerFrame)
 
 -- 2. 操作パネル
 local controlPanel = Instance.new("Frame")
@@ -252,4 +299,119 @@ actionLayout.Parent = actionPanel
 local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
 local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
 
-print("UI Setup: Added Spring & Conveyor")
+-- ■ 紙吹雪システム
+local confettiActive = false
+local confettiPieces = {}
+local colors = {
+	Color3.fromRGB(255, 80, 80),
+	Color3.fromRGB(80, 255, 80),
+	Color3.fromRGB(80, 80, 255),
+	Color3.fromRGB(255, 255, 80),
+	Color3.fromRGB(255, 80, 255),
+	Color3.fromRGB(80, 255, 255),
+}
+
+local function spawnConfetti()
+	for i = 1, 60 do -- 数を調整
+		local piece = Instance.new("Frame")
+		piece.Size = UDim2.new(0, math.random(10, 20), 0, math.random(5, 10))
+		piece.BackgroundColor3 = colors[math.random(1, #colors)]
+		piece.BorderSizePixel = 0
+		piece.Position = UDim2.new(math.random(), 0, -0.1, 0) -- 画面上から
+		piece.Parent = confettiContainer
+
+		table.insert(confettiPieces, {
+			Gui = piece,
+			Speed = math.random(100, 300), -- 落下速度
+			Sway = math.random(50, 150), -- 横揺れ幅
+			SwaySpeed = math.random(2, 5), -- 横揺れ速度
+			RotationSpeed = math.random(-180, 180),
+			TimeOffset = math.random() * 10,
+		})
+	end
+	confettiActive = true
+end
+
+local function stopConfetti()
+	confettiActive = false
+	for _, data in ipairs(confettiPieces) do
+		data.Gui:Destroy()
+	end
+	confettiPieces = {}
+end
+
+-- 紙吹雪アニメーションループ
+RunService.RenderStepped:Connect(function(dt)
+	if not confettiActive then
+		return
+	end
+	local screenSize = screenGui.AbsoluteSize
+
+	for _, data in ipairs(confettiPieces) do
+		local piece = data.Gui
+		local time = tick() + data.TimeOffset
+
+		-- 落下
+		local currentY = piece.Position.Y.Scale * screenSize.Y
+		local newY = currentY + data.Speed * dt
+
+		-- 横揺れ
+		local currentX = piece.Position.X.Scale * screenSize.X
+		local sway = math.sin(time * data.SwaySpeed) * data.Sway * dt
+		local newX = currentX + sway
+
+		-- 回転
+		piece.Rotation = piece.Rotation + data.RotationSpeed * dt
+
+		-- ループ (画面外に出たら上に戻す)
+		if newY > screenSize.Y + 50 then
+			newY = -50
+			newX = math.random() * screenSize.X
+		end
+
+		piece.Position = UDim2.new(0, newX, 0, newY)
+	end
+end)
+
+-- ■ イベントハンドリング
+StageClearEvent.OnClientEvent:Connect(function(stageIndex)
+	-- 1. UI表示
+	resultFrame.Visible = true
+	editFrame.Visible = false -- プレイUIを隠す
+
+	-- 2. アニメーション
+	TweenService:Create(resultFrame, TweenInfo.new(0.5), { BackgroundTransparency = 0.3 }):Play()
+
+	clearLabel.Position = UDim2.new(0, 0, 0.4, 0) -- 少し下から
+	clearLabel.TextTransparency = 1
+	local t1 = TweenService:Create(
+		clearLabel,
+		TweenInfo.new(0.8, Enum.EasingStyle.Bounce),
+		{ Position = UDim2.new(0, 0, 0.3, 0), TextTransparency = 0 }
+	)
+	t1:Play()
+
+	btnNext.BackgroundTransparency = 1
+	btnNext.TextTransparency = 1
+	task.wait(0.5)
+	local t2 = TweenService:Create(btnNext, TweenInfo.new(0.5), { BackgroundTransparency = 0.5, TextTransparency = 0 })
+	t2:Play()
+
+	-- 3. 紙吹雪開始
+	spawnConfetti()
+end)
+
+btnNext.MouseButton1Click:Connect(function()
+	-- サーバーへ次へリクエスト
+	GameControlEvent:FireServer("next")
+end)
+
+UpdateStageEvent.OnClientEvent:Connect(function(index, data)
+	-- ステージが更新されたらUIを戻す
+	stopConfetti()
+	resultFrame.Visible = false
+	editFrame.Visible = true
+	stageLabel.Text = "STAGE: " .. string.format("%02d", index)
+end)
+
+print("UI Setup: Clear Screen & Confetti Implemented")
