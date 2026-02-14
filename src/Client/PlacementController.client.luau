@@ -36,11 +36,9 @@ local buttonUp = controlPanel:WaitForChild("ButtonUp")
 local buttonDown = controlPanel:WaitForChild("ButtonDown")
 local buttonDelete = controlPanel:WaitForChild("ButtonDelete")
 
--- 設定
 local GRID_SIZE = 4
 local MOVE_STEP = 4
 
--- 状態
 local isDraggingNewBlock = false
 local draggingBlockType = nil
 local ghostPart = nil
@@ -59,7 +57,6 @@ local raycastParams = RaycastParams.new()
 raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 raycastParams.FilterDescendantsInstances = { player.Character }
 
--- Helper Functions
 local function createGhost(blockType)
 	if ghostPart then
 		ghostPart:Destroy()
@@ -101,22 +98,19 @@ local function createGhost(blockType)
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Block
 		part.Size = Vector3.new(4, 1, 4)
-
-		-- 矢印表示 (SurfaceGui + TextLabel)
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = Enum.NormalId.Top
 		gui.CanvasSize = Vector2.new(200, 200)
-		-- ★修正: 光の影響を受けなくする（常に明るく表示）
 		gui.LightInfluence = 0
 		gui.Parent = part
-
 		local arrow = Instance.new("TextLabel")
 		arrow.Size = UDim2.fromScale(1, 1)
 		arrow.BackgroundTransparency = 1
 		arrow.Text = "⬆"
 		arrow.TextColor3 = Color3.new(0, 0, 0)
 		arrow.TextScaled = true
-		arrow.Font = Enum.Font.GothamBold
+		-- ★フォント変更
+		arrow.Font = Enum.Font.FredokaOne
 		arrow.Parent = gui
 	end
 
@@ -124,12 +118,10 @@ local function createGhost(blockType)
 		if blockType ~= "Fan" and blockType ~= "Spring" and blockType ~= "Conveyor" then
 			part.Size = Vector3.new(4, 4, 4)
 		end
-
 		part.Transparency = 0.25
 		part.CanCollide = false
 		part.CastShadow = false
 		part.Material = Enum.Material.ForceField
-
 		if blockType == "Fan" then
 			part.Color = Palette.Entity.FanHousing
 		elseif blockType == "Spring" then
@@ -139,7 +131,6 @@ local function createGhost(blockType)
 		else
 			part.Color = Palette.BlockColors[blockType] or Palette.System.Ghost
 		end
-
 		part.Anchored = true
 		part.Parent = workspace
 		local currentFilter = raycastParams.FilterDescendantsInstances
@@ -156,7 +147,6 @@ local function getSnappedPosition(position, yOverride)
 	return Vector3.new(snappedX, snappedY, snappedZ)
 end
 
--- 1. ドラッグ設定
 local function setupDragButton(button, blockType)
 	button.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -175,11 +165,9 @@ setupDragButton(buttonFan, "Fan")
 setupDragButton(buttonSpring, "Spring")
 setupDragButton(buttonConveyor, "Conveyor")
 
--- 2. メインループ
 RunService.RenderStepped:Connect(function()
 	local mouseLocation = UserInputService:GetMouseLocation()
 	local ray = workspace.CurrentCamera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
-
 	if isDraggingNewBlock and ghostPart then
 		local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
 		if result then
@@ -193,9 +181,7 @@ RunService.RenderStepped:Connect(function()
 		local dragParams = RaycastParams.new()
 		dragParams.FilterType = Enum.RaycastFilterType.Exclude
 		dragParams.FilterDescendantsInstances = dragFilter
-
 		local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, dragParams)
-
 		if result then
 			local currentY = dragTargetBlock.Position.Y
 			local newPos = getSnappedPosition(result.Position, currentY)
@@ -204,15 +190,12 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- 3. 入力処理
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
-
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local target = mouse.Target
-
 		if
 			target
 			and (target.Name:match("^PlacedBlock_") or target:IsDescendantOf(workspace:FindFirstChild("PlacedBlocks")))
@@ -221,7 +204,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			if model and (model.Name:match("Fan") or model.Name:match("Spring") or model.Name:match("Conveyor")) then
 				target = model.PrimaryPart or target
 			end
-
 			isDraggingExisting = true
 			dragTargetBlock = target
 			dragStartPos = target.Position
@@ -233,7 +215,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			selectionBox.Adornee = nil
 		end
 	end
-
 	if input.KeyCode == Enum.KeyCode.R then
 		requestUpdate("rotate", Vector3.new(0, 90, 0))
 	elseif input.KeyCode == Enum.KeyCode.Delete or input.KeyCode == Enum.KeyCode.Backspace then
@@ -255,7 +236,6 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
 			raycastParams.FilterDescendantsInstances = { player.Character }
 			isDraggingNewBlock = false
 		end
-
 		if isDraggingExisting and dragTargetBlock then
 			UpdateBlockEvent:FireServer(dragTargetBlock, "moveTo", dragTargetBlock.Position)
 			mouse.TargetFilter = nil
@@ -300,4 +280,4 @@ buttonDelete.MouseButton1Click:Connect(function()
 	requestUpdate("delete", nil)
 end)
 
-print("Placement Controller: Conveyor Ghost Fixed")
+print("Placement Controller: Ghost Font Fixed")

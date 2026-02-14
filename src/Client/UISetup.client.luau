@@ -20,11 +20,10 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
--- ★修正: クリア画面 (背景を黒くせず透明のままにする)
 local resultFrame = Instance.new("Frame")
 resultFrame.Name = "ResultFrame"
 resultFrame.Size = UDim2.new(1, 0, 1, 0)
-resultFrame.BackgroundTransparency = 1 -- 常に透明
+resultFrame.BackgroundTransparency = 1
 resultFrame.Visible = false
 resultFrame.ZIndex = 100
 resultFrame.Parent = screenGui
@@ -42,15 +41,14 @@ clearLabel.Size = UDim2.new(1, 0, 0.2, 0)
 clearLabel.Position = UDim2.new(0, 0, 0.3, 0)
 clearLabel.BackgroundTransparency = 1
 clearLabel.TextColor3 = Color3.new(1, 1, 1)
--- 文字の輪郭をつけて読みやすくする
 clearLabel.TextStrokeTransparency = 0
 clearLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-clearLabel.Font = Enum.Font.GothamBlack
+-- ★フォント変更 (ポップに)
+clearLabel.Font = Enum.Font.FredokaOne
 clearLabel.TextSize = 60
 clearLabel.TextTransparency = 1
 clearLabel.Parent = resultFrame
 
--- 既存の編集用フレーム
 local editFrame = Instance.new("Frame")
 editFrame.Name = "EditFrame"
 editFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -92,7 +90,6 @@ local function applyGlassStyle(guiObject, cornerRadius)
 	end
 end
 
--- 次のステージへボタン
 local btnNext = Instance.new("TextButton")
 btnNext.Name = "ButtonNext"
 btnNext.Size = UDim2.new(0, 200, 0, 60)
@@ -100,7 +97,8 @@ btnNext.Position = UDim2.new(0.5, 0, 0.6, 0)
 btnNext.AnchorPoint = Vector2.new(0.5, 0.5)
 btnNext.Text = "Next Stage"
 btnNext.TextColor3 = Color3.new(1, 1, 1)
-btnNext.Font = Enum.Font.GothamBold
+-- ★フォント変更
+btnNext.Font = Enum.Font.FredokaOne
 btnNext.TextSize = 24
 btnNext.TextTransparency = 1
 btnNext.Parent = resultFrame
@@ -108,7 +106,6 @@ applyGlassStyle(btnNext, 30)
 btnNext.BackgroundColor3 = Palette.System.Success
 btnNext.BackgroundTransparency = 1
 
--- 1. ドロワーメニュー
 local drawerFrame = Instance.new("Frame")
 drawerFrame.Name = "DrawerMenu"
 drawerFrame.Size = UDim2.new(0, 100, 0.7, 0)
@@ -133,10 +130,8 @@ local function create3DButton(name, blockType, parent)
 	viewport.Position = UDim2.new(0.1, 0, 0.1, 0)
 	viewport.BackgroundTransparency = 1
 	viewport.Parent = btn
-
 	local part
 	local camera = Instance.new("Camera")
-
 	if blockType == "Block" then
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Block
@@ -159,7 +154,6 @@ local function create3DButton(name, blockType, parent)
 		part.Shape = Enum.PartType.Block
 		part.Size = Vector3.new(4, 0.5, 4)
 	end
-
 	if part then
 		part.Size = Vector3.new(4, 4, 4)
 		if blockType == "Fan" then
@@ -201,7 +195,6 @@ local btnFan = create3DButton("ButtonFan", "Fan", drawerFrame)
 local btnSpring = create3DButton("ButtonSpring", "Spring", drawerFrame)
 local btnConveyor = create3DButton("ButtonConveyor", "Conveyor", drawerFrame)
 
--- 2. 操作パネル
 local controlPanel = Instance.new("Frame")
 controlPanel.Name = "ControlPanel"
 controlPanel.AutomaticSize = Enum.AutomaticSize.X
@@ -233,7 +226,8 @@ local function createTextButton(name, text, parent, color, size, layoutOrder)
 	btn.Size = size or defaultSize
 	btn.Text = text
 	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.Font = Enum.Font.GothamMedium
+	-- ★フォント変更
+	btn.Font = Enum.Font.FredokaOne
 	btn.TextSize = 16
 	btn.LayoutOrder = layoutOrder or 0
 	btn.Parent = parent
@@ -255,7 +249,6 @@ local btnRotZ =
 local btnDelete =
 	createTextButton("ButtonDelete", "Del", controlPanel, Palette.System.Error, UDim2.new(0, 50, 0, 50), 6)
 
--- 3. ヘッダー
 local headerFrame = Instance.new("Frame")
 headerFrame.Name = "HeaderFrame"
 headerFrame.Size = UDim2.new(0, 180, 0, 50)
@@ -269,11 +262,11 @@ stageLabel.Size = UDim2.new(1, 0, 1, 0)
 stageLabel.BackgroundTransparency = 1
 stageLabel.Text = "STAGE: 01"
 stageLabel.TextColor3 = Color3.new(1, 1, 1)
-stageLabel.Font = Enum.Font.GothamBold
+-- ★フォント変更
+stageLabel.Font = Enum.Font.FredokaOne
 stageLabel.TextSize = 22
 stageLabel.Parent = headerFrame
 
--- 4. アクションパネル
 local actionPanel = Instance.new("Frame")
 actionPanel.Name = "ActionPanel"
 actionPanel.AutomaticSize = Enum.AutomaticSize.X
@@ -300,7 +293,6 @@ actionLayout.Parent = actionPanel
 local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
 local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
 
--- ■ 紙吹雪システム
 local confettiActive = false
 local confettiPieces = {}
 local colors = {
@@ -320,15 +312,17 @@ local function spawnConfetti()
 		piece.BorderSizePixel = 0
 		piece.Position = UDim2.new(math.random(), 0, -0.1, 0)
 		piece.Parent = confettiContainer
-
-		table.insert(confettiPieces, {
-			Gui = piece,
-			Speed = math.random(100, 300),
-			Sway = math.random(50, 150),
-			SwaySpeed = math.random(2, 5),
-			RotationSpeed = math.random(-180, 180),
-			TimeOffset = math.random() * 10,
-		})
+		table.insert(
+			confettiPieces,
+			{
+				Gui = piece,
+				Speed = math.random(100, 300),
+				Sway = math.random(50, 150),
+				SwaySpeed = math.random(2, 5),
+				RotationSpeed = math.random(-180, 180),
+				TimeOffset = math.random() * 10,
+			}
+		)
 	end
 	confettiActive = true
 end
@@ -363,13 +357,9 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- ■ イベントハンドリング
 StageClearEvent.OnClientEvent:Connect(function(stageIndex)
 	resultFrame.Visible = true
 	editFrame.Visible = false
-
-	-- ★修正: 背景を暗くする処理を削除し、文字とボタンのみフェードイン
-
 	clearLabel.Position = UDim2.new(0, 0, 0.4, 0)
 	clearLabel.TextTransparency = 1
 	local t1 = TweenService:Create(
@@ -378,13 +368,11 @@ StageClearEvent.OnClientEvent:Connect(function(stageIndex)
 		{ Position = UDim2.new(0, 0, 0.3, 0), TextTransparency = 0 }
 	)
 	t1:Play()
-
 	btnNext.BackgroundTransparency = 1
 	btnNext.TextTransparency = 1
 	task.wait(0.5)
 	local t2 = TweenService:Create(btnNext, TweenInfo.new(0.5), { BackgroundTransparency = 0.5, TextTransparency = 0 })
 	t2:Play()
-
 	spawnConfetti()
 end)
 
@@ -399,4 +387,4 @@ UpdateStageEvent.OnClientEvent:Connect(function(index, data)
 	stageLabel.Text = "STAGE: " .. string.format("%02d", index)
 end)
 
-print("UI Setup: Clear Screen Brightness Fixed")
+print("UI Setup: Pop Fonts & Style Applied")
