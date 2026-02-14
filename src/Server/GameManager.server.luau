@@ -20,37 +20,40 @@ local MAX_CAPTURE_SPEED = 60
 
 -- ■ ステージデータ
 local STAGE_DATA = {
+	-- Stage 1: 直進
 	[1] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(0, -2, -25),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -25) },
 		Fans = {},
 		TutorialBlocks = {
-			-- ★修正: Wedgeを1つだけにする
+			-- ★修正: 1つだけ表示
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
+	-- Stage 2: 90度反射
 	[2] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(20, -2, -20),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20), Vector3.new(20, 2, -20) },
 		Fans = {},
 		TutorialBlocks = {
-			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
+			-- ★修正: スタート用は消し、最も重要な「反射用ブロック」1つだけを表示
 			{ Type = "Block", Position = Vector3.new(0, 2, -20), Rotation = Vector3.new(0, 45, 0) },
-			{ Type = "Block", Position = Vector3.new(-2, 2, -22), Rotation = Vector3.new(0, 45, 0) },
 		},
 	},
+	-- Stage 3: 長距離坂道
 	[3] = {
 		Start = Vector3.new(0, 30, 20),
 		Goal = Vector3.new(0, -2, -30),
 		Waypoints = { Vector3.new(0, 30, 20), Vector3.new(0, 2, 20), Vector3.new(0, 2, 0), Vector3.new(0, 2, -30) },
 		Fans = {},
 		TutorialBlocks = {
+			-- ★修正: 着地点のWedge 1つだけを表示
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 20), Rotation = Vector3.new(0, 0, 0) },
-			{ Type = "Wedge", Position = Vector3.new(0, 2, 16), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
+	-- Stage 4: 扇風機
 	[4] = {
 		Start = Vector3.new(0, 15, 30),
 		Goal = Vector3.new(0, -2, -30),
@@ -64,10 +67,11 @@ local STAGE_DATA = {
 			},
 		},
 		TutorialBlocks = {
+			-- ★修正: スタートのWedge 1つだけを表示
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 30), Rotation = Vector3.new(0, 0, 0) },
-			{ Type = "Block", Position = Vector3.new(0, 2, 26), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
+	-- Stage 5: 風×ジャンプ
 	[5] = {
 		Start = Vector3.new(-20, 15, 0),
 		Goal = Vector3.new(20, 10, 0),
@@ -81,7 +85,8 @@ local STAGE_DATA = {
 			},
 		},
 		TutorialBlocks = {
-			{ Type = "Wedge", Position = Vector3.new(-20, 2, 0), Rotation = Vector3.new(0, -90, 0) },
+			-- ★修正: ギミックの核となる「ジャンプ台」1つだけを表示
+			-- (スタート用の坂はユーザーに考えてもらう)
 			{ Type = "Wedge", Position = Vector3.new(15, 2, 0), Rotation = Vector3.new(0, 90, 0) },
 		},
 	},
@@ -470,4 +475,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Single Ghost for Stage 1")
+print("GameManager Updated: 1 Ghost Block per Stage & No Dupes")

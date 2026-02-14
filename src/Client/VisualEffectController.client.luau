@@ -94,7 +94,7 @@ local function drawTutorialGhosts(stageData)
 				part.Color = Color3.new(0.8, 0.8, 0.8)
 			end
 
-			-- ★修正: 透明度を固定 (アニメーションなし)
+			-- ★修正: 透明度を固定しアニメーションさせない
 			part.Transparency = 0.4
 			part.Anchored = true
 			part.CanCollide = false
@@ -108,12 +108,12 @@ local function drawTutorialGhosts(stageData)
 			local highlight = Instance.new("Highlight")
 			highlight.FillColor = part.Color
 			highlight.OutlineColor = Color3.new(1, 1, 1)
-			-- ★修正: 塗りつぶしも少し薄めに固定
+			-- ★修正: 塗りつぶしも固定
 			highlight.FillTransparency = 0.6
 			highlight.OutlineTransparency = 0
 			highlight.Parent = part
 
-			-- ★修正: 点滅アニメーション(Tween)を削除
+			-- ※ アニメーション処理(Tween)は削除しました
 
 			part.Parent = tutorialFolder
 		end
