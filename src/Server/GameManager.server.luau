@@ -9,6 +9,9 @@ local Palette = require(Shared:WaitForChild("Palette"))
 
 local GameControlEvent = require(Events.GameControlEvent)
 local UpdateStageEvent = require(Events.UpdateStageEvent)
+-- ★追加: ブロック配置用イベント読み込み (BlockManagerを統合)
+local PlaceBlockEvent = require(Events:WaitForChild("PlaceBlockEvent"))
+local UpdateBlockEvent = require(Events:WaitForChild("UpdateBlockEvent"))
 
 -- 設定
 local BALL_SIZE = 4
@@ -18,72 +21,48 @@ local GOAL_WIDTH = 12
 local MAGNET_RADIUS = HOLE_SIZE * 2.5
 local MAX_CAPTURE_SPEED = 60
 
--- ★AIアシスト設定
-local AI_ASSIST_RANGE = 8
-local AI_CORRECTION_POWER = 4
-local AI_PROPULSION_POWER = 0
+-- AIアシスト設定
+local AI_ASSIST_RANGE = 10
+local AI_CORRECTION_POWER = 6
+local AI_MIN_SPEED = 5
+local AI_NUDGE_POWER = 15
 
 -- ■ ステージデータ
 local STAGE_DATA = {
 	[1] = {
 		Start = Vector3.new(0, 15, 0),
-		Goal = Vector3.new(0, -2, -25),
-		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -25) },
+		Goal = Vector3.new(0, -2, -24),
+		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -24) },
 		Fans = {},
-		TutorialBlocks = {
-			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
-		},
+		TutorialBlocks = {},
 	},
 	[2] = {
-		Start = Vector3.new(0, 15, 0),
+		Start = Vector3.new(4, 15, 0),
 		Goal = Vector3.new(20, -2, -20),
-		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20), Vector3.new(20, 2, -20) },
+		Waypoints = { Vector3.new(4, 15, 0), Vector3.new(4, 2, 0), Vector3.new(4, 2, -20), Vector3.new(20, 2, -20) },
 		Fans = {},
-		TutorialBlocks = {
-			-- ★修正: ブロック位置を奥(-2, -22)にずらし、ボールがZ=-20まで進めるようにする
-			{ Type = "Block", Position = Vector3.new(-2, 2, -22), Rotation = Vector3.new(0, 45, 0) },
-		},
+		TutorialBlocks = {},
 	},
 	[3] = {
 		Start = Vector3.new(0, 30, 20),
-		Goal = Vector3.new(0, -2, -30),
-		Waypoints = { Vector3.new(0, 30, 20), Vector3.new(0, 2, 20), Vector3.new(0, 2, 0), Vector3.new(0, 2, -30) },
+		Goal = Vector3.new(0, -2, -32),
+		Waypoints = { Vector3.new(0, 30, 20), Vector3.new(0, 2, 20), Vector3.new(0, 2, -32) },
 		Fans = {},
-		TutorialBlocks = {
-			{ Type = "Wedge", Position = Vector3.new(0, 2, 20), Rotation = Vector3.new(0, 0, 0) },
-		},
+		TutorialBlocks = {},
 	},
 	[4] = {
-		Start = Vector3.new(0, 15, 30),
-		Goal = Vector3.new(0, -2, -30),
-		Waypoints = { Vector3.new(0, 15, 30), Vector3.new(0, 2, 30), Vector3.new(0, 2, 0), Vector3.new(0, 2, -30) },
-		Fans = {
-			{
-				Position = Vector3.new(0, 2, 0),
-				Direction = Vector3.new(0, 0, -1),
-				Power = 60,
-				Size = Vector3.new(8, 8, 20),
-			},
-		},
-		TutorialBlocks = {
-			{ Type = "Wedge", Position = Vector3.new(0, 2, 30), Rotation = Vector3.new(0, 0, 0) },
-		},
+		Start = Vector3.new(0, 15, 32),
+		Goal = Vector3.new(0, -2, -32),
+		Waypoints = { Vector3.new(0, 15, 32), Vector3.new(0, 2, 32), Vector3.new(0, 2, -32) },
+		Fans = {}, -- ★修正: ステージファンを空に。プレイヤーがファンを配置する。
+		TutorialBlocks = {},
 	},
 	[5] = {
 		Start = Vector3.new(-20, 15, 0),
 		Goal = Vector3.new(20, 10, 0),
-		Waypoints = { Vector3.new(-20, 15, 0), Vector3.new(-20, 2, 0), Vector3.new(0, 2, 0), Vector3.new(20, 10, 0) },
-		Fans = {
-			{
-				Position = Vector3.new(-10, 2, 0),
-				Direction = Vector3.new(1, 0, 0),
-				Power = 80,
-				Size = Vector3.new(20, 8, 8),
-			},
-		},
-		TutorialBlocks = {
-			{ Type = "Wedge", Position = Vector3.new(15, 2, 0), Rotation = Vector3.new(0, 90, 0) },
-		},
+		Waypoints = { Vector3.new(-20, 15, 0), Vector3.new(-20, 2, 0), Vector3.new(16, 2, 0), Vector3.new(20, 10, 0) },
+		Fans = {}, -- ★修正: ステージファンを空に。
+		TutorialBlocks = {},
 	},
 }
 
@@ -111,8 +90,16 @@ local function getClosestPointOnSegment(point, a, b)
 	return a + ab * t
 end
 
--- ■ 物理処理
+-- ■ 物理処理ループ (風の処理含む)
 RunService.Heartbeat:Connect(function(dt)
+	-- 不要な風ゾーン(削除されたファン)の掃除
+	for i = #activeWindZones, 1, -1 do
+		local zone = activeWindZones[i]
+		if not zone.Part or not zone.Part.Parent then
+			table.remove(activeWindZones, i)
+		end
+	end
+
 	if not currentBall or currentBall.Anchored or isGoalLocked then
 		return
 	end
@@ -120,8 +107,10 @@ RunService.Heartbeat:Connect(function(dt)
 	-- 1. 風の処理
 	for _, zoneData in ipairs(activeWindZones) do
 		local zonePart = zoneData.Part
-		local direction = zoneData.Direction
-		local power = zoneData.Power
+		-- ファンモデル自体が動く(回転する)可能性があるので、方向は毎回計算
+		local direction = zonePart.CFrame.LookVector
+		local power = zoneData.Power or 60 -- デフォルトパワー
+
 		local relPos = zonePart.CFrame:PointToObjectSpace(currentBall.Position)
 		local size = zonePart.Size
 		if
@@ -144,13 +133,10 @@ RunService.Heartbeat:Connect(function(dt)
 		for i = 1, #data.Waypoints - 1 do
 			local p1 = data.Waypoints[i]
 			local p2 = data.Waypoints[i + 1]
-			if p2.Y < 5 then
-				p2 = Vector3.new(p2.X, 2, p2.Z)
-			end
-
-			local closest = getClosestPointOnSegment(ballPos, p1, p2)
+			local p1_flat = Vector3.new(p1.X, ballPos.Y, p1.Z)
+			local p2_flat = Vector3.new(p2.X, ballPos.Y, p2.Z)
+			local closest = getClosestPointOnSegment(ballPos, p1_flat, p2_flat)
 			local dist = (ballPos - closest).Magnitude
-
 			if dist < closestDist then
 				closestDist = dist
 				targetPoint = closest
@@ -162,12 +148,19 @@ RunService.Heartbeat:Connect(function(dt)
 			local correctionVec = (targetPoint - ballPos) * AI_CORRECTION_POWER * dt
 			correctionVec = Vector3.new(correctionVec.X, 0, correctionVec.Z)
 			currentBall.AssemblyLinearVelocity = currentBall.AssemblyLinearVelocity + correctionVec
+
+			local speed =
+				Vector3.new(currentBall.AssemblyLinearVelocity.X, 0, currentBall.AssemblyLinearVelocity.Z).Magnitude
+			if speed < AI_MIN_SPEED and targetDir then
+				currentBall.AssemblyLinearVelocity = currentBall.AssemblyLinearVelocity
+					+ (targetDir * AI_NUDGE_POWER * dt)
+			end
 		end
 	end
 end)
 
--- ■ 扇風機生成
-local function spawnFan(fanData)
+-- ■ 扇風機生成 (汎用: ステージ＆ユーザー)
+local function spawnFan(position, rotation, isUserBlock)
 	local model = Instance.new("Model")
 	model.Name = "FanModel"
 	local housing = Instance.new("Part")
@@ -177,8 +170,22 @@ local function spawnFan(fanData)
 	housing.Color = Palette.Entity.FanHousing
 	housing.Material = Enum.Material.Metal
 	housing.Anchored = true
-	housing.CFrame = CFrame.lookAt(fanData.Position, fanData.Position + fanData.Direction)
-		* CFrame.Angles(0, math.rad(90), 0)
+	housing.CanCollide = false
+	housing.CanQuery = true -- クリック選択可能に
+
+	-- 回転の適用
+	local baseCFrame = CFrame.new(position)
+	if typeof(rotation) == "Vector3" then
+		baseCFrame = baseCFrame * CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+	elseif typeof(rotation) == "CFrame" then
+		baseCFrame = rotation -- CFrameそのものが渡された場合
+	else
+		-- デフォルト向き
+		baseCFrame = baseCFrame * CFrame.Angles(0, math.rad(90), 0)
+	end
+
+	-- Cylinderは横向きがデフォなので、前方を向くように調整
+	housing.CFrame = baseCFrame * CFrame.Angles(0, math.rad(90), 0)
 	housing.Parent = model
 
 	local blades = Instance.new("Part")
@@ -189,6 +196,7 @@ local function spawnFan(fanData)
 	blades.Material = Enum.Material.Plastic
 	blades.Anchored = true
 	blades.CanCollide = false
+	blades.CanQuery = false
 	blades.CFrame = housing.CFrame
 	blades.Parent = model
 	local blades2 = blades:Clone()
@@ -204,18 +212,18 @@ local function spawnFan(fanData)
 		end
 	end)
 
+	-- 風の当たり判定エリア (前方に伸ばす)
 	local zone = Instance.new("Part")
 	zone.Name = "WindZone"
-	zone.Size = fanData.Size
+	zone.Size = Vector3.new(8, 8, 20)
 	zone.Color = Palette.Entity.WindZone
 	zone.Transparency = 0.8
 	zone.Material = Enum.Material.ForceField
 	zone.Anchored = true
 	zone.CanCollide = false
 	zone.CanQuery = false
-
-	zone.CFrame = CFrame.lookAt(fanData.Position, fanData.Position + fanData.Direction)
-		* CFrame.new(0, 0, -fanData.Size.Z / 2 - 1)
+	-- CylinderのCFrame基準だと、LookVector方向はRightVectorになる等の癖があるため、baseCFrame(向き)基準で配置
+	zone.CFrame = baseCFrame * CFrame.new(0, 0, -12) -- 前方へオフセット
 	zone.Parent = model
 
 	local attachment = Instance.new("Attachment", housing)
@@ -229,9 +237,108 @@ local function spawnFan(fanData)
 	particle.EmissionDirection = Enum.NormalId.Right
 	particle.Parent = attachment
 
-	model.Parent = workspace
-	table.insert(activeWindZones, { Part = zone, Direction = fanData.Direction, Power = fanData.Power })
+	if isUserBlock then
+		model.Name = "PlacedBlock_Fan" -- 識別用プレフィックス
+		model.PrimaryPart = housing
+		local folder = workspace:FindFirstChild("PlacedBlocks") or Instance.new("Folder", workspace)
+		folder.Name = "PlacedBlocks"
+		model.Parent = folder
+	else
+		model.Parent = workspace
+	end
+
+	table.insert(activeWindZones, { Part = zone, Power = 60 })
+	return model
 end
+
+-- ■ ブロック配置処理 (統合済み)
+PlaceBlockEvent.OnServerEvent:Connect(function(player, blockType, position, rotation)
+	print("Placing:", blockType)
+
+	-- ファンの配置
+	if blockType == "Fan" then
+		spawnFan(position, rotation, true)
+		return
+	end
+
+	-- 通常ブロックの配置
+	local newBlock
+	if blockType == "Block" then
+		newBlock = Instance.new("Part")
+		newBlock.Shape = Enum.PartType.Block
+	elseif blockType == "Sphere" then
+		newBlock = Instance.new("Part")
+		newBlock.Shape = Enum.PartType.Ball
+	elseif blockType == "Wedge" then
+		newBlock = Instance.new("WedgePart")
+	elseif blockType == "CornerWedge" then
+		newBlock = Instance.new("CornerWedgePart")
+	elseif blockType == "Cylinder" then
+		newBlock = Instance.new("Part")
+		newBlock.Shape = Enum.PartType.Cylinder
+		newBlock.CFrame = newBlock.CFrame * CFrame.Angles(0, 0, math.rad(90))
+	end
+
+	if newBlock then
+		newBlock.Name = "PlacedBlock_" .. blockType
+		newBlock.Size = Vector3.new(4, 4, 4)
+		newBlock.Anchored = true
+		newBlock.Material = Enum.Material.Plastic
+		newBlock.Color = Palette.BlockColors[blockType] or Color3.new(0.8, 0.8, 0.8)
+
+		-- 回転の適用
+		if typeof(rotation) == "Vector3" then
+			newBlock.CFrame = CFrame.new(position)
+				* CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+		else
+			newBlock.Position = position
+		end
+
+		local folder = workspace:FindFirstChild("PlacedBlocks") or Instance.new("Folder", workspace)
+		folder.Name = "PlacedBlocks"
+		newBlock.Parent = folder
+	end
+end)
+
+-- ■ ブロック操作処理 (移動・回転・削除)
+UpdateBlockEvent.OnServerEvent:Connect(function(player, block, action, value)
+	if not block or not block.Parent then
+		return
+	end
+
+	-- モデル(Fan)の場合の対応
+	local target = block
+	if block.Parent:IsA("Model") then
+		target = block.Parent -- モデルごと操作
+	end
+
+	if action == "move" then
+		if target:IsA("Model") then
+			target:PivotTo(target:GetPivot() + value)
+		else
+			target.Position = target.Position + value
+		end
+	elseif action == "rotate" then
+		if target:IsA("Model") then
+			target:PivotTo(target:GetPivot() * CFrame.Angles(math.rad(value.X), math.rad(value.Y), math.rad(value.Z)))
+		else
+			target.CFrame = target.CFrame * CFrame.Angles(math.rad(value.X), math.rad(value.Y), math.rad(value.Z))
+		end
+	elseif action == "moveTo" then
+		if target:IsA("Model") then
+			local currentRot = target:GetPivot().Rotation
+			target:PivotTo(CFrame.new(value) * currentRot)
+		else
+			target.Position = value
+		end
+	elseif action == "delete" then
+		target:Destroy()
+		-- activeWindZonesはHeartbeat内で自動クリーンアップされる
+	end
+
+	-- 更新通知
+	UpdateBlockEvent:FireAllClients(target)
+end)
 
 -- ■ ゴール吸い込み
 local function captureBallIntoHole(ball, cupCenterPosition)
@@ -454,12 +561,14 @@ end
 loadStage = function(index)
 	isGoalLocked = false
 	currentStageIndex = index
+	-- ステージ切り替え時は全ファンを消去 (activeWindZonesもリセット)
 	for _, zone in ipairs(activeWindZones) do
 		if zone.Part and zone.Part.Parent and zone.Part.Parent.Parent then
 			zone.Part.Parent:Destroy()
 		end
 	end
 	activeWindZones = {}
+
 	local data = STAGE_DATA[index]
 	if data then
 		currentStartPos = data.Start
@@ -468,9 +577,10 @@ loadStage = function(index)
 		clearUserBlocks()
 		spawnGoal()
 		spawnBall()
+		-- ステージ固定ファンがあればここで生成
 		if data.Fans then
 			for _, fanData in ipairs(data.Fans) do
-				spawnFan(fanData)
+				spawnFan(fanData.Position, CFrame.lookAt(Vector3.zero, fanData.Direction), false)
 			end
 		end
 		UpdateStageEvent:FireAllClients(index, data)
@@ -513,4 +623,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Corrected Guide Block Position for Stage 2")
+print("GameManager Updated: Fan Block Added & Block Manager Integrated")

@@ -55,11 +55,11 @@ local function applyGlassStyle(guiObject, cornerRadius)
 	end
 end
 
--- 1. ドロワーメニュー
+-- 1. ドロワーメニュー (ボタン追加)
 local drawerFrame = Instance.new("Frame")
 drawerFrame.Name = "DrawerMenu"
-drawerFrame.Size = UDim2.new(0, 100, 0.6, 0)
-drawerFrame.Position = UDim2.new(0, 20, 0.2, 0)
+drawerFrame.Size = UDim2.new(0, 100, 0.7, 0) -- 少し縦長に
+drawerFrame.Position = UDim2.new(0, 20, 0.15, 0)
 drawerFrame.BackgroundTransparency = 1
 drawerFrame.Parent = editFrame
 
@@ -80,7 +80,10 @@ local function create3DButton(name, blockType, parent)
 	viewport.Position = UDim2.new(0.1, 0, 0.1, 0)
 	viewport.BackgroundTransparency = 1
 	viewport.Parent = btn
+
 	local part
+	local camera = Instance.new("Camera")
+
 	if blockType == "Block" then
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Block
@@ -89,38 +92,52 @@ local function create3DButton(name, blockType, parent)
 		part.Shape = Enum.PartType.Ball
 	elseif blockType == "Wedge" then
 		part = Instance.new("WedgePart")
+	elseif blockType == "Fan" then
+		-- ファンの簡易表示 (円柱)
+		part = Instance.new("Part")
+		part.Shape = Enum.PartType.Cylinder
+		part.CFrame = CFrame.Angles(0, math.rad(90), 0) -- 横向き
 	end
+
 	if part then
 		part.Size = Vector3.new(4, 4, 4)
-		part.Color = Palette.BlockColors[blockType] or Color3.new(1, 1, 1)
+		if blockType == "Fan" then
+			part.Color = Palette.Entity.FanHousing or Color3.new(0.5, 0.5, 0.5)
+			part.Size = Vector3.new(2, 6, 6)
+		else
+			part.Color = Palette.BlockColors[blockType] or Color3.new(1, 1, 1)
+		end
 		part.Material = Enum.Material.Plastic
 		part.Reflectance = 0.1
 		part.Anchored = true
 		part.Position = Vector3.new(0, 0, 0)
 		part.Parent = viewport
-		local camera = Instance.new("Camera")
+
 		camera.CFrame = CFrame.new(Vector3.new(6, 5, 6), part.Position)
 		viewport.CurrentCamera = camera
 		camera.Parent = viewport
+
 		task.spawn(function()
 			local t = 0
 			while part.Parent do
 				t = t + 0.01
-				part.CFrame = CFrame.Angles(0, t, 0)
+				part.CFrame = part.CFrame * CFrame.Angles(0, 0.03, 0)
 				task.wait(0.03)
 			end
 		end)
 	end
 	return btn
 end
+
 local btnBlock = create3DButton("ButtonBlock", "Block", drawerFrame)
 local btnSphere = create3DButton("ButtonSphere", "Sphere", drawerFrame)
 local btnWedge = create3DButton("ButtonWedge", "Wedge", drawerFrame)
+-- ★追加: ファンボタン
+local btnFan = create3DButton("ButtonFan", "Fan", drawerFrame)
 
 -- 2. 操作パネル
 local controlPanel = Instance.new("Frame")
 controlPanel.Name = "ControlPanel"
--- ★修正: 削除ボタンが入る分、幅を広げる (380 -> 460)
 controlPanel.Size = UDim2.new(0, 460, 0, 80)
 controlPanel.AnchorPoint = Vector2.new(0.5, 1)
 controlPanel.Position = UDim2.new(0.5, 0, 0.95, 0)
@@ -160,8 +177,6 @@ local btnRotY =
 	createTextButton("ButtonRotateY", "Rot Y", controlPanel, Color3.fromRGB(80, 255, 80), UDim2.new(0, 60, 0, 50), 4)
 local btnRotZ =
 	createTextButton("ButtonRotateZ", "Rot Z", controlPanel, Color3.fromRGB(80, 80, 255), UDim2.new(0, 60, 0, 50), 5)
-
--- ★追加: 削除ボタン
 local btnDelete =
 	createTextButton("ButtonDelete", "Del", controlPanel, Palette.System.Error, UDim2.new(0, 50, 0, 50), 6)
 
@@ -200,4 +215,4 @@ actionLayout.Parent = actionPanel
 local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
 local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
 
-print("UI Setup: Added Delete Button")
+print("UI Setup: Added Fan Button")

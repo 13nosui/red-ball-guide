@@ -24,6 +24,8 @@ local drawerMenu = editFrame:WaitForChild("DrawerMenu")
 local buttonBlock = drawerMenu:WaitForChild("ButtonBlock")
 local buttonSphere = drawerMenu:WaitForChild("ButtonSphere")
 local buttonWedge = drawerMenu:WaitForChild("ButtonWedge")
+-- ★追加: ファンボタン
+local buttonFan = drawerMenu:WaitForChild("ButtonFan")
 
 local controlPanel = editFrame:WaitForChild("ControlPanel")
 local buttonRotateX = controlPanel:WaitForChild("ButtonRotateX")
@@ -31,7 +33,6 @@ local buttonRotateY = controlPanel:WaitForChild("ButtonRotateY")
 local buttonRotateZ = controlPanel:WaitForChild("ButtonRotateZ")
 local buttonUp = controlPanel:WaitForChild("ButtonUp")
 local buttonDown = controlPanel:WaitForChild("ButtonDown")
--- ★追加: 削除ボタンの取得
 local buttonDelete = controlPanel:WaitForChild("ButtonDelete")
 
 -- 設定
@@ -49,7 +50,6 @@ selectionBox.Color3 = Palette.System.Selection
 selectionBox.LineThickness = 0.05
 selectionBox.Parent = playerGui
 
--- ドラッグ＆ドロップ用の状態
 local isDraggingExisting = false
 local dragTargetBlock = nil
 local dragStartPos = nil
@@ -78,14 +78,38 @@ local function createGhost(blockType)
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Cylinder
 		part.CFrame = part.CFrame * CFrame.Angles(0, 0, math.rad(90))
+
+	-- ★追加: ファンのゴースト (円柱で代用し、風向きを示す矢印デカールを貼る)
+	elseif blockType == "Fan" then
+		part = Instance.new("Part")
+		part.Shape = Enum.PartType.Cylinder
+		part.Size = Vector3.new(2, 6, 6)
+		-- デフォルトで横向き
+		part.CFrame = part.CFrame * CFrame.Angles(0, math.rad(90), 0)
+
+		-- 風向き表示
+		local decal = Instance.new("Decal")
+		decal.Texture = "rbxassetid://6005741632" -- 矢印テクスチャ
+		decal.Face = Enum.NormalId.Right
+		decal.Parent = part
 	end
+
 	if part then
-		part.Size = Vector3.new(4, 4, 4)
+		if blockType ~= "Fan" then
+			part.Size = Vector3.new(4, 4, 4)
+		end
+
 		part.Transparency = 0.5
 		part.CanCollide = false
 		part.CastShadow = false
 		part.Material = Enum.Material.ForceField
-		part.Color = Palette.BlockColors[blockType] or Palette.System.Ghost
+
+		if blockType == "Fan" then
+			part.Color = Palette.Entity.FanHousing
+		else
+			part.Color = Palette.BlockColors[blockType] or Palette.System.Ghost
+		end
+
 		part.Anchored = true
 		part.Parent = workspace
 		local currentFilter = raycastParams.FilterDescendantsInstances
@@ -117,6 +141,8 @@ end
 setupDragButton(buttonBlock, "Block")
 setupDragButton(buttonSphere, "Sphere")
 setupDragButton(buttonWedge, "Wedge")
+-- ★追加: ファンボタンのセットアップ
+setupDragButton(buttonFan, "Fan")
 
 -- 2. メインループ
 RunService.RenderStepped:Connect(function()
@@ -156,7 +182,17 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local target = mouse.Target
 
-		if target and target.Name:match("^PlacedBlock_") then
+		-- ユーザーが置いたブロック(FanModel含む)を選択
+		if
+			target
+			and (target.Name:match("^PlacedBlock_") or target:IsDescendantOf(workspace:FindFirstChild("PlacedBlocks")))
+		then
+			-- モデル全体を選択するロジック
+			local model = target:FindFirstAncestorOfClass("Model")
+			if model and model.Name == "FanModel" then
+				target = model.PrimaryPart or target
+			end
+
 			isDraggingExisting = true
 			dragTargetBlock = target
 			dragStartPos = target.Position
@@ -180,7 +216,9 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		if isDraggingNewBlock then
 			if not gameProcessed and ghostPart and ghostPart.Transparency < 1 then
-				PlaceBlockEvent:FireServer(draggingBlockType, ghostPart.Position, Vector3.new(0, 0, 0))
+				-- ★修正: ファンの回転情報を送信するためにRotationも渡す
+				local rot = ghostPart.Orientation
+				PlaceBlockEvent:FireServer(draggingBlockType, ghostPart.Position, rot)
 			end
 			if ghostPart then
 				ghostPart:Destroy()
@@ -208,7 +246,6 @@ end)
 function requestUpdate(action, value)
 	if selectedBlock and selectedBlock.Parent then
 		UpdateBlockEvent:FireServer(selectedBlock, action, value)
-		-- 削除時は選択解除
 		if action == "delete" then
 			selectedBlock = nil
 			selectionBox.Adornee = nil
@@ -216,7 +253,6 @@ function requestUpdate(action, value)
 	end
 end
 
--- Rotation Buttons
 buttonRotateX.MouseButton1Click:Connect(function()
 	requestUpdate("rotate", Vector3.new(45, 0, 0))
 end)
@@ -226,18 +262,14 @@ end)
 buttonRotateZ.MouseButton1Click:Connect(function()
 	requestUpdate("rotate", Vector3.new(0, 0, 45))
 end)
-
--- Height Buttons
 buttonUp.MouseButton1Click:Connect(function()
 	requestUpdate("move", Vector3.new(0, MOVE_STEP, 0))
 end)
 buttonDown.MouseButton1Click:Connect(function()
 	requestUpdate("move", Vector3.new(0, -MOVE_STEP, 0))
 end)
-
--- ★追加: 削除ボタンイベント
 buttonDelete.MouseButton1Click:Connect(function()
 	requestUpdate("delete", nil)
 end)
 
-print("Placement Controller: Added Delete Functionality")
+print("Placement Controller: Added Fan Functionality")
