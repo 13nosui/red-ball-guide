@@ -24,7 +24,6 @@ local drawerMenu = editFrame:WaitForChild("DrawerMenu")
 local buttonBlock = drawerMenu:WaitForChild("ButtonBlock")
 local buttonSphere = drawerMenu:WaitForChild("ButtonSphere")
 local buttonWedge = drawerMenu:WaitForChild("ButtonWedge")
--- ★追加: ファンボタン
 local buttonFan = drawerMenu:WaitForChild("ButtonFan")
 
 local controlPanel = editFrame:WaitForChild("ControlPanel")
@@ -78,18 +77,14 @@ local function createGhost(blockType)
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Cylinder
 		part.CFrame = part.CFrame * CFrame.Angles(0, 0, math.rad(90))
-
-	-- ★追加: ファンのゴースト (円柱で代用し、風向きを示す矢印デカールを貼る)
 	elseif blockType == "Fan" then
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Cylinder
 		part.Size = Vector3.new(2, 6, 6)
-		-- デフォルトで横向き
 		part.CFrame = part.CFrame * CFrame.Angles(0, math.rad(90), 0)
 
-		-- 風向き表示
 		local decal = Instance.new("Decal")
-		decal.Texture = "rbxassetid://6005741632" -- 矢印テクスチャ
+		decal.Texture = "rbxassetid://6005741632"
 		decal.Face = Enum.NormalId.Right
 		decal.Parent = part
 	end
@@ -99,7 +94,9 @@ local function createGhost(blockType)
 			part.Size = Vector3.new(4, 4, 4)
 		end
 
-		part.Transparency = 0.5
+		-- ★修正: 透明度を下げて視認性を上げる (0.5 -> 0.25)
+		part.Transparency = 0.25
+
 		part.CanCollide = false
 		part.CastShadow = false
 		part.Material = Enum.Material.ForceField
@@ -141,7 +138,6 @@ end
 setupDragButton(buttonBlock, "Block")
 setupDragButton(buttonSphere, "Sphere")
 setupDragButton(buttonWedge, "Wedge")
--- ★追加: ファンボタンのセットアップ
 setupDragButton(buttonFan, "Fan")
 
 -- 2. メインループ
@@ -153,7 +149,8 @@ RunService.RenderStepped:Connect(function()
 		local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
 		if result then
 			ghostPart.Position = getSnappedPosition(result.Position)
-			ghostPart.Transparency = 0.5
+			-- ドラッグ中は常にこの透明度 (0.25)
+			ghostPart.Transparency = 0.25
 		else
 			ghostPart.Transparency = 1
 		end
@@ -182,12 +179,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local target = mouse.Target
 
-		-- ユーザーが置いたブロック(FanModel含む)を選択
 		if
 			target
 			and (target.Name:match("^PlacedBlock_") or target:IsDescendantOf(workspace:FindFirstChild("PlacedBlocks")))
 		then
-			-- モデル全体を選択するロジック
 			local model = target:FindFirstAncestorOfClass("Model")
 			if model and model.Name == "FanModel" then
 				target = model.PrimaryPart or target
@@ -216,7 +211,6 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		if isDraggingNewBlock then
 			if not gameProcessed and ghostPart and ghostPart.Transparency < 1 then
-				-- ★修正: ファンの回転情報を送信するためにRotationも渡す
 				local rot = ghostPart.Orientation
 				PlaceBlockEvent:FireServer(draggingBlockType, ghostPart.Position, rot)
 			end
@@ -272,4 +266,4 @@ buttonDelete.MouseButton1Click:Connect(function()
 	requestUpdate("delete", nil)
 end)
 
-print("Placement Controller: Added Fan Functionality")
+print("Placement Controller: Ghost Transparency Lowered to 0.25")
