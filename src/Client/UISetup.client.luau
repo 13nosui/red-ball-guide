@@ -96,6 +96,17 @@ local function create3DButton(name, blockType, parent)
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Cylinder
 		part.CFrame = CFrame.Angles(0, math.rad(90), 0)
+	-- ★追加: ジャンプ台 (平たい円柱)
+	elseif blockType == "Spring" then
+		part = Instance.new("Part")
+		part.Shape = Enum.PartType.Cylinder
+		part.Size = Vector3.new(0.5, 4, 4) -- 高さ低め
+		part.CFrame = CFrame.Angles(0, 0, math.rad(90)) -- 縦向き
+	-- ★追加: 加速床 (平たいブロック)
+	elseif blockType == "Conveyor" then
+		part = Instance.new("Part")
+		part.Shape = Enum.PartType.Block
+		part.Size = Vector3.new(4, 0.5, 4)
 	end
 
 	if part then
@@ -103,6 +114,12 @@ local function create3DButton(name, blockType, parent)
 		if blockType == "Fan" then
 			part.Color = Palette.Entity.FanHousing or Color3.new(0.5, 0.5, 0.5)
 			part.Size = Vector3.new(2, 6, 6)
+		elseif blockType == "Spring" then
+			part.Color = Color3.fromRGB(255, 100, 100) -- 赤
+			part.Size = Vector3.new(1, 4, 4)
+		elseif blockType == "Conveyor" then
+			part.Color = Color3.fromRGB(255, 255, 100) -- 黄色
+			part.Size = Vector3.new(4, 1, 4)
 		else
 			part.Color = Palette.BlockColors[blockType] or Color3.new(1, 1, 1)
 		end
@@ -128,15 +145,17 @@ local function create3DButton(name, blockType, parent)
 	return btn
 end
 
+-- ボタン生成順序
 local btnBlock = create3DButton("ButtonBlock", "Block", drawerFrame)
 local btnSphere = create3DButton("ButtonSphere", "Sphere", drawerFrame)
 local btnWedge = create3DButton("ButtonWedge", "Wedge", drawerFrame)
 local btnFan = create3DButton("ButtonFan", "Fan", drawerFrame)
+local btnSpring = create3DButton("ButtonSpring", "Spring", drawerFrame) -- ★追加
+local btnConveyor = create3DButton("ButtonConveyor", "Conveyor", drawerFrame) -- ★追加
 
--- 2. 操作パネル (Padding修正)
+-- 2. 操作パネル
 local controlPanel = Instance.new("Frame")
 controlPanel.Name = "ControlPanel"
--- 幅を自動調整(AutomaticSize)にするため、SizeのXは0にする
 controlPanel.AutomaticSize = Enum.AutomaticSize.X
 controlPanel.Size = UDim2.new(0, 0, 0, 80)
 controlPanel.AnchorPoint = Vector2.new(0.5, 1)
@@ -144,7 +163,6 @@ controlPanel.Position = UDim2.new(0.5, 0, 0.95, 0)
 controlPanel.Parent = editFrame
 applyGlassStyle(controlPanel, 40)
 
--- ★追加: UIPaddingで上下左右を均等(15px)にする
 local controlPadding = Instance.new("UIPadding")
 controlPadding.PaddingTop = UDim.new(0, 15)
 controlPadding.PaddingBottom = UDim.new(0, 15)
@@ -163,7 +181,6 @@ panelLayout.Parent = controlPanel
 local function createTextButton(name, text, parent, color, size, layoutOrder)
 	local btn = Instance.new("TextButton")
 	btn.Name = name
-	-- 正円にするには、サイズ50x50に対して半径25を指定する
 	local defaultSize = UDim2.new(0, 50, 0, 50)
 	btn.Size = size or defaultSize
 	btn.Text = text
@@ -172,7 +189,6 @@ local function createTextButton(name, text, parent, color, size, layoutOrder)
 	btn.TextSize = 16
 	btn.LayoutOrder = layoutOrder or 0
 	btn.Parent = parent
-	-- 半径25で正円化 (サイズが50の場合)
 	applyGlassStyle(btn, 25)
 	btn.BackgroundColor3 = color
 	btn.BackgroundTransparency = 0.5
@@ -180,19 +196,14 @@ local function createTextButton(name, text, parent, color, size, layoutOrder)
 end
 
 local moveColor = Palette.System.Move
--- Down/Up/Delは正円 (50x50)
 local btnDown = createTextButton("ButtonDown", "Down", controlPanel, moveColor, UDim2.new(0, 50, 0, 50), 1)
 local btnUp = createTextButton("ButtonUp", "Up", controlPanel, moveColor, UDim2.new(0, 50, 0, 50), 2)
-
--- ★修正: Rot X -> X, サイズ50x50で正円化
 local btnRotX =
 	createTextButton("ButtonRotateX", "X", controlPanel, Color3.fromRGB(255, 80, 80), UDim2.new(0, 50, 0, 50), 3)
 local btnRotY =
 	createTextButton("ButtonRotateY", "Y", controlPanel, Color3.fromRGB(80, 255, 80), UDim2.new(0, 50, 0, 50), 4)
 local btnRotZ =
 	createTextButton("ButtonRotateZ", "Z", controlPanel, Color3.fromRGB(80, 80, 255), UDim2.new(0, 50, 0, 50), 5)
-
--- Delボタン
 local btnDelete =
 	createTextButton("ButtonDelete", "Del", controlPanel, Palette.System.Error, UDim2.new(0, 50, 0, 50), 6)
 
@@ -214,10 +225,9 @@ stageLabel.Font = Enum.Font.GothamBold
 stageLabel.TextSize = 22
 stageLabel.Parent = headerFrame
 
--- 4. アクションパネル (Padding修正)
+-- 4. アクションパネル
 local actionPanel = Instance.new("Frame")
 actionPanel.Name = "ActionPanel"
--- 幅を自動調整
 actionPanel.AutomaticSize = Enum.AutomaticSize.X
 actionPanel.Size = UDim2.new(0, 0, 0, 80)
 actionPanel.AnchorPoint = Vector2.new(1, 1)
@@ -225,7 +235,6 @@ actionPanel.Position = UDim2.new(0.95, 0, 0.95, 0)
 actionPanel.Parent = editFrame
 applyGlassStyle(actionPanel, 40)
 
--- ★追加: UIPaddingで上下左右を均等(15px)にする
 local actionPadding = Instance.new("UIPadding")
 actionPadding.PaddingTop = UDim.new(0, 15)
 actionPadding.PaddingBottom = UDim.new(0, 15)
@@ -243,4 +252,4 @@ actionLayout.Parent = actionPanel
 local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
 local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
 
-print("UI Setup: Adjusted Padding & Circular Buttons")
+print("UI Setup: Added Spring & Conveyor")
