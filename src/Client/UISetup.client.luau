@@ -2,7 +2,7 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService") -- 追加
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -10,7 +10,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Events = Shared:WaitForChild("Events")
 local GameControlEvent = require(Events:WaitForChild("GameControlEvent"))
 local UpdateStageEvent = require(Events:WaitForChild("UpdateStageEvent"))
--- ★追加: 動的に作られるイベントを待つ
 local StageClearEvent = Events:WaitForChild("StageClearEvent")
 
 local Palette = require(Shared:WaitForChild("Palette"))
@@ -21,12 +20,11 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
--- ★追加: 結果表示用フレーム (全画面)
+-- ★修正: クリア画面 (背景を黒くせず透明のままにする)
 local resultFrame = Instance.new("Frame")
 resultFrame.Name = "ResultFrame"
 resultFrame.Size = UDim2.new(1, 0, 1, 0)
-resultFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-resultFrame.BackgroundTransparency = 1 -- 初期は透明
+resultFrame.BackgroundTransparency = 1 -- 常に透明
 resultFrame.Visible = false
 resultFrame.ZIndex = 100
 resultFrame.Parent = screenGui
@@ -44,6 +42,9 @@ clearLabel.Size = UDim2.new(1, 0, 0.2, 0)
 clearLabel.Position = UDim2.new(0, 0, 0.3, 0)
 clearLabel.BackgroundTransparency = 1
 clearLabel.TextColor3 = Color3.new(1, 1, 1)
+-- 文字の輪郭をつけて読みやすくする
+clearLabel.TextStrokeTransparency = 0
+clearLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 clearLabel.Font = Enum.Font.GothamBlack
 clearLabel.TextSize = 60
 clearLabel.TextTransparency = 1
@@ -91,7 +92,7 @@ local function applyGlassStyle(guiObject, cornerRadius)
 	end
 end
 
--- ★追加: 次のステージへボタン
+-- 次のステージへボタン
 local btnNext = Instance.new("TextButton")
 btnNext.Name = "ButtonNext"
 btnNext.Size = UDim2.new(0, 200, 0, 60)
@@ -105,7 +106,7 @@ btnNext.TextTransparency = 1
 btnNext.Parent = resultFrame
 applyGlassStyle(btnNext, 30)
 btnNext.BackgroundColor3 = Palette.System.Success
-btnNext.BackgroundTransparency = 1 -- 初期は消す
+btnNext.BackgroundTransparency = 1
 
 -- 1. ドロワーメニュー
 local drawerFrame = Instance.new("Frame")
@@ -312,19 +313,19 @@ local colors = {
 }
 
 local function spawnConfetti()
-	for i = 1, 60 do -- 数を調整
+	for i = 1, 60 do
 		local piece = Instance.new("Frame")
 		piece.Size = UDim2.new(0, math.random(10, 20), 0, math.random(5, 10))
 		piece.BackgroundColor3 = colors[math.random(1, #colors)]
 		piece.BorderSizePixel = 0
-		piece.Position = UDim2.new(math.random(), 0, -0.1, 0) -- 画面上から
+		piece.Position = UDim2.new(math.random(), 0, -0.1, 0)
 		piece.Parent = confettiContainer
 
 		table.insert(confettiPieces, {
 			Gui = piece,
-			Speed = math.random(100, 300), -- 落下速度
-			Sway = math.random(50, 150), -- 横揺れ幅
-			SwaySpeed = math.random(2, 5), -- 横揺れ速度
+			Speed = math.random(100, 300),
+			Sway = math.random(50, 150),
+			SwaySpeed = math.random(2, 5),
 			RotationSpeed = math.random(-180, 180),
 			TimeOffset = math.random() * 10,
 		})
@@ -340,49 +341,36 @@ local function stopConfetti()
 	confettiPieces = {}
 end
 
--- 紙吹雪アニメーションループ
 RunService.RenderStepped:Connect(function(dt)
 	if not confettiActive then
 		return
 	end
 	local screenSize = screenGui.AbsoluteSize
-
 	for _, data in ipairs(confettiPieces) do
 		local piece = data.Gui
 		local time = tick() + data.TimeOffset
-
-		-- 落下
 		local currentY = piece.Position.Y.Scale * screenSize.Y
 		local newY = currentY + data.Speed * dt
-
-		-- 横揺れ
 		local currentX = piece.Position.X.Scale * screenSize.X
 		local sway = math.sin(time * data.SwaySpeed) * data.Sway * dt
 		local newX = currentX + sway
-
-		-- 回転
 		piece.Rotation = piece.Rotation + data.RotationSpeed * dt
-
-		-- ループ (画面外に出たら上に戻す)
 		if newY > screenSize.Y + 50 then
 			newY = -50
 			newX = math.random() * screenSize.X
 		end
-
 		piece.Position = UDim2.new(0, newX, 0, newY)
 	end
 end)
 
 -- ■ イベントハンドリング
 StageClearEvent.OnClientEvent:Connect(function(stageIndex)
-	-- 1. UI表示
 	resultFrame.Visible = true
-	editFrame.Visible = false -- プレイUIを隠す
+	editFrame.Visible = false
 
-	-- 2. アニメーション
-	TweenService:Create(resultFrame, TweenInfo.new(0.5), { BackgroundTransparency = 0.3 }):Play()
+	-- ★修正: 背景を暗くする処理を削除し、文字とボタンのみフェードイン
 
-	clearLabel.Position = UDim2.new(0, 0, 0.4, 0) -- 少し下から
+	clearLabel.Position = UDim2.new(0, 0, 0.4, 0)
 	clearLabel.TextTransparency = 1
 	local t1 = TweenService:Create(
 		clearLabel,
@@ -397,21 +385,18 @@ StageClearEvent.OnClientEvent:Connect(function(stageIndex)
 	local t2 = TweenService:Create(btnNext, TweenInfo.new(0.5), { BackgroundTransparency = 0.5, TextTransparency = 0 })
 	t2:Play()
 
-	-- 3. 紙吹雪開始
 	spawnConfetti()
 end)
 
 btnNext.MouseButton1Click:Connect(function()
-	-- サーバーへ次へリクエスト
 	GameControlEvent:FireServer("next")
 end)
 
 UpdateStageEvent.OnClientEvent:Connect(function(index, data)
-	-- ステージが更新されたらUIを戻す
 	stopConfetti()
 	resultFrame.Visible = false
 	editFrame.Visible = true
 	stageLabel.Text = "STAGE: " .. string.format("%02d", index)
 end)
 
-print("UI Setup: Clear Screen & Confetti Implemented")
+print("UI Setup: Clear Screen Brightness Fixed")
