@@ -43,7 +43,6 @@ clearLabel.BackgroundTransparency = 1
 clearLabel.TextColor3 = Color3.new(1, 1, 1)
 clearLabel.TextStrokeTransparency = 0
 clearLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
--- ★フォント変更 (ポップに)
 clearLabel.Font = Enum.Font.FredokaOne
 clearLabel.TextSize = 60
 clearLabel.TextTransparency = 1
@@ -55,37 +54,50 @@ editFrame.Size = UDim2.new(1, 0, 1, 0)
 editFrame.BackgroundTransparency = 1
 editFrame.Parent = screenGui
 
+-- ★修正: 明るい背景に対応した Glass Style
 local function applyGlassStyle(guiObject, cornerRadius)
 	guiObject.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	guiObject.BackgroundTransparency = 0.65
+	guiObject.BackgroundTransparency = 0.65 -- ガラス感
 	guiObject.BorderSizePixel = 0
+
 	local corner = guiObject:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, cornerRadius or 16)
 	corner.Parent = guiObject
+
 	local stroke = guiObject:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(255, 255, 255)
-	stroke.Transparency = 0.4
-	stroke.Thickness = 1.5
+	-- 【変更点】白から「濃いグレー(ネイビー寄り)」に変更して、明るい床でも見えるようにする
+	stroke.Color = Color3.fromRGB(60, 60, 80)
+	stroke.Transparency = 0.6 -- 薄くして影っぽく見せる
+	stroke.Thickness = 2 -- 少し太くして視認性アップ
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Parent = guiObject
 
 	local originalTransparency = guiObject.BackgroundTransparency
+
 	if guiObject:IsA("GuiButton") then
 		guiObject.MouseEnter:Connect(function()
-			TweenService:Create(
-				guiObject,
-				TweenInfo.new(0.3, Enum.EasingStyle.Quint),
-				{ BackgroundTransparency = 0.4, BackgroundColor3 = Color3.fromRGB(240, 240, 255) }
-			):Play()
-			TweenService:Create(stroke, TweenInfo.new(0.3), { Transparency = 0.1 }):Play()
+			-- ホバー時は少し「濃く」して反応を示す (背景が白いため)
+			TweenService:Create(guiObject, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+				BackgroundTransparency = 0.3, -- 透明度を下げて白を強調
+				BackgroundColor3 = Color3.fromRGB(240, 245, 255), -- ほんのり青白く
+			}):Play()
+			-- 枠線を濃くする
+			TweenService:Create(stroke, TweenInfo.new(0.3), {
+				Transparency = 0.3,
+				Color = Color3.fromRGB(40, 40, 60),
+			}):Play()
 		end)
+
 		guiObject.MouseLeave:Connect(function()
-			TweenService:Create(
-				guiObject,
-				TweenInfo.new(0.3, Enum.EasingStyle.Quint),
-				{ BackgroundTransparency = originalTransparency, BackgroundColor3 = Color3.fromRGB(255, 255, 255) }
-			):Play()
-			TweenService:Create(stroke, TweenInfo.new(0.3), { Transparency = 0.4 }):Play()
+			TweenService:Create(guiObject, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+				BackgroundTransparency = originalTransparency,
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			}):Play()
+			-- 枠線を元に戻す
+			TweenService:Create(stroke, TweenInfo.new(0.3), {
+				Transparency = 0.6,
+				Color = Color3.fromRGB(60, 60, 80),
+			}):Play()
 		end)
 	end
 end
@@ -97,7 +109,6 @@ btnNext.Position = UDim2.new(0.5, 0, 0.6, 0)
 btnNext.AnchorPoint = Vector2.new(0.5, 0.5)
 btnNext.Text = "Next Stage"
 btnNext.TextColor3 = Color3.new(1, 1, 1)
--- ★フォント変更
 btnNext.Font = Enum.Font.FredokaOne
 btnNext.TextSize = 24
 btnNext.TextTransparency = 1
@@ -226,7 +237,6 @@ local function createTextButton(name, text, parent, color, size, layoutOrder)
 	btn.Size = size or defaultSize
 	btn.Text = text
 	btn.TextColor3 = Color3.new(1, 1, 1)
-	-- ★フォント変更
 	btn.Font = Enum.Font.FredokaOne
 	btn.TextSize = 16
 	btn.LayoutOrder = layoutOrder or 0
@@ -262,7 +272,6 @@ stageLabel.Size = UDim2.new(1, 0, 1, 0)
 stageLabel.BackgroundTransparency = 1
 stageLabel.Text = "STAGE: 01"
 stageLabel.TextColor3 = Color3.new(1, 1, 1)
--- ★フォント変更
 stageLabel.Font = Enum.Font.FredokaOne
 stageLabel.TextSize = 22
 stageLabel.Parent = headerFrame
@@ -387,4 +396,4 @@ UpdateStageEvent.OnClientEvent:Connect(function(index, data)
 	stageLabel.Text = "STAGE: " .. string.format("%02d", index)
 end)
 
-print("UI Setup: Pop Fonts & Style Applied")
+print("UI Setup: Fixed UI Visibility for Bright Backgrounds")
