@@ -25,7 +25,6 @@ local buttonBlock = drawerMenu:WaitForChild("ButtonBlock")
 local buttonSphere = drawerMenu:WaitForChild("ButtonSphere")
 local buttonWedge = drawerMenu:WaitForChild("ButtonWedge")
 local buttonFan = drawerMenu:WaitForChild("ButtonFan")
--- ★追加ボタン
 local buttonSpring = drawerMenu:WaitForChild("ButtonSpring")
 local buttonConveyor = drawerMenu:WaitForChild("ButtonConveyor")
 
@@ -89,30 +88,37 @@ local function createGhost(blockType)
 		decal.Texture = "rbxassetid://6005741632"
 		decal.Face = Enum.NormalId.Right
 		decal.Parent = part
-
-	-- ★追加: ジャンプ台ゴースト
 	elseif blockType == "Spring" then
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Cylinder
-		part.Size = Vector3.new(1, 4, 4) -- 平たい円柱
-		-- 上面（跳ねる方向）を示すために上向きに
+		part.Size = Vector3.new(1, 4, 4)
 		part.CFrame = part.CFrame * CFrame.Angles(0, 0, math.rad(90))
-		-- 上矢印テクスチャ
 		local decal = Instance.new("Decal")
 		decal.Texture = "rbxassetid://7012896580"
 		decal.Face = Enum.NormalId.Right
 		decal.Parent = part
 
-	-- ★追加: 加速床ゴースト
+	-- ★修正: 加速床ゴースト (SurfaceGuiで矢印を表示)
 	elseif blockType == "Conveyor" then
 		part = Instance.new("Part")
 		part.Shape = Enum.PartType.Block
-		part.Size = Vector3.new(4, 1, 4) -- 薄い板
-		-- 進行方向(Front)に矢印
-		local decal = Instance.new("Decal")
-		decal.Texture = "rbxassetid://6005741632"
-		decal.Face = Enum.NormalId.Top
-		decal.Parent = part
+		part.Size = Vector3.new(4, 1, 4)
+
+		-- 矢印表示 (SurfaceGui + TextLabel)
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = Enum.NormalId.Top
+		gui.CanvasSize = Vector2.new(200, 200)
+		gui.Parent = part
+
+		local arrow = Instance.new("TextLabel")
+		arrow.Size = UDim2.fromScale(1, 1)
+		arrow.BackgroundTransparency = 1
+		arrow.Text = "⬆" -- 太い矢印
+		arrow.TextColor3 = Color3.new(0, 0, 0) -- 黒色で見やすく
+		arrow.TextScaled = true
+		arrow.Font = Enum.Font.GothamBold
+		arrow.Rotation = 0 -- 上向き(Front方向)
+		arrow.Parent = gui
 	end
 
 	if part then
@@ -167,8 +173,8 @@ setupDragButton(buttonBlock, "Block")
 setupDragButton(buttonSphere, "Sphere")
 setupDragButton(buttonWedge, "Wedge")
 setupDragButton(buttonFan, "Fan")
-setupDragButton(buttonSpring, "Spring") -- ★追加
-setupDragButton(buttonConveyor, "Conveyor") -- ★追加
+setupDragButton(buttonSpring, "Spring")
+setupDragButton(buttonConveyor, "Conveyor")
 
 -- 2. メインループ
 RunService.RenderStepped:Connect(function()
@@ -213,7 +219,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			and (target.Name:match("^PlacedBlock_") or target:IsDescendantOf(workspace:FindFirstChild("PlacedBlocks")))
 		then
 			local model = target:FindFirstAncestorOfClass("Model")
-			-- モデル(Fan, Spring, Conveyorなど)なら親を選択
 			if model and (model.Name:match("Fan") or model.Name:match("Spring") or model.Name:match("Conveyor")) then
 				target = model.PrimaryPart or target
 			end
@@ -296,4 +301,4 @@ buttonDelete.MouseButton1Click:Connect(function()
 	requestUpdate("delete", nil)
 end)
 
-print("Placement Controller: Spring & Conveyor Ready")
+print("Placement Controller: Conveyor Arrow Visual Fixed")
