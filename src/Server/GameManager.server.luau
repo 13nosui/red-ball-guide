@@ -243,12 +243,91 @@ local function spawnFan(position, rotation, isUserBlock)
 	return model
 end
 
+-- ■ ジャンプ台生成
+local function spawnSpring(position, rotation)
+	local model = Instance.new("Model")
+	model.Name = "PlacedBlock_Spring"
+	local springPart = Instance.new("Part")
+	springPart.Name = "SpringPart"
+	springPart.Shape = Enum.PartType.Cylinder
+	springPart.Size = Vector3.new(1, 4, 4)
+	springPart.Color = Color3.fromRGB(255, 100, 100)
+	springPart.Material = Enum.Material.Neon
+	springPart.Anchored = true
+	local baseCFrame = CFrame.new(position)
+	if typeof(rotation) == "Vector3" then
+		baseCFrame = baseCFrame * CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+	end
+	springPart.CFrame = baseCFrame * CFrame.Angles(0, 0, math.rad(90))
+	springPart.Parent = model
+
+	local debounce = false
+	springPart.Touched:Connect(function(hit)
+		if hit.Name == "RedBall" and not debounce then
+			debounce = true
+			local jumpDir = springPart.CFrame.RightVector
+			local JUMP_POWER = 80
+			hit.AssemblyLinearVelocity = Vector3.new(hit.AssemblyLinearVelocity.X, 0, hit.AssemblyLinearVelocity.Z)
+			hit:ApplyImpulse(jumpDir * hit.AssemblyMass * JUMP_POWER)
+			TweenService
+				:Create(springPart, TweenInfo.new(0.1, Enum.EasingStyle.Bounce), { Size = Vector3.new(2, 4, 4) })
+				:Play()
+			task.wait(0.1)
+			TweenService
+				:Create(springPart, TweenInfo.new(0.3, Enum.EasingStyle.Elastic), { Size = Vector3.new(1, 4, 4) })
+				:Play()
+			task.wait(0.5)
+			debounce = false
+		end
+	end)
+	model.PrimaryPart = springPart
+	local folder = workspace:FindFirstChild("PlacedBlocks") or Instance.new("Folder", workspace)
+	folder.Name = "PlacedBlocks"
+	model.Parent = folder
+end
+
+-- ■ 加速床生成
+local function spawnConveyor(position, rotation)
+	local model = Instance.new("Model")
+	model.Name = "PlacedBlock_Conveyor"
+	local pad = Instance.new("Part")
+	pad.Name = "Pad"
+	pad.Shape = Enum.PartType.Block
+	pad.Size = Vector3.new(4, 1, 4)
+	pad.Color = Color3.fromRGB(255, 255, 100)
+	pad.Material = Enum.Material.Plastic
+	pad.Anchored = true
+	local baseCFrame = CFrame.new(position)
+	if typeof(rotation) == "Vector3" then
+		baseCFrame = baseCFrame * CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+	end
+	pad.CFrame = baseCFrame
+	local SPEED = 40
+	pad.AssemblyLinearVelocity = pad.CFrame.LookVector * SPEED
+	local decal = Instance.new("Decal")
+	decal.Texture = "rbxassetid://6005741632"
+	decal.Face = Enum.NormalId.Top
+	decal.Parent = pad
+	pad.Parent = model
+	model.PrimaryPart = pad
+	local folder = workspace:FindFirstChild("PlacedBlocks") or Instance.new("Folder", workspace)
+	folder.Name = "PlacedBlocks"
+	model.Parent = folder
+end
+
 -- ■ ブロック配置処理
 PlaceBlockEvent.OnServerEvent:Connect(function(player, blockType, position, rotation)
 	print("Placing:", blockType)
-
 	if blockType == "Fan" then
 		spawnFan(position, rotation, true)
+		return
+	end
+	if blockType == "Spring" then
+		spawnSpring(position, rotation)
+		return
+	end
+	if blockType == "Conveyor" then
+		spawnConveyor(position, rotation)
 		return
 	end
 
@@ -275,14 +354,12 @@ PlaceBlockEvent.OnServerEvent:Connect(function(player, blockType, position, rota
 		newBlock.Anchored = true
 		newBlock.Material = Enum.Material.Plastic
 		newBlock.Color = Palette.BlockColors[blockType] or Color3.new(0.8, 0.8, 0.8)
-
 		if typeof(rotation) == "Vector3" then
 			newBlock.CFrame = CFrame.new(position)
 				* CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
 		else
 			newBlock.Position = position
 		end
-
 		local folder = workspace:FindFirstChild("PlacedBlocks") or Instance.new("Folder", workspace)
 		folder.Name = "PlacedBlocks"
 		newBlock.Parent = folder
@@ -298,7 +375,6 @@ UpdateBlockEvent.OnServerEvent:Connect(function(player, block, action, value)
 	if block.Parent:IsA("Model") then
 		target = block.Parent
 	end
-
 	if action == "move" then
 		if target:IsA("Model") then
 			target:PivotTo(target:GetPivot() + value)
@@ -361,7 +437,7 @@ clearUserBlocks = function()
 	end
 end
 
--- ★復活: 床に四角い穴を開ける関数
+-- ★復活: 床に四角い穴を開ける関数 (4つのパーツで生成)
 local function createFloorWithGap(gapPosition, gapSize)
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if baseplate then
@@ -454,7 +530,7 @@ spawnBall = function()
 	return ball
 end
 
--- ■ ゴール生成 (修正版: 4分割パーツで四角い穴を作る + 四角い底)
+-- ■ ゴール生成 (4分割で四角い枠を作成 + 四角い底)
 local function spawnGoal()
 	local existingGoal = workspace:FindFirstChild("GoalModel")
 	if existingGoal then
@@ -467,7 +543,7 @@ local function spawnGoal()
 	-- 1. 床に四角い穴を開ける
 	createFloorWithGap(currentGoalPos, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
 
-	-- 2. 四角い穴の枠（カップの側面）を作る (4分割方式)
+	-- 2. 四角い枠を作る (4つのパーツを配置)
 	local halfWidth = GOAL_WIDTH / 2
 	local halfHole = HOLE_SIZE / 2
 	local stripWidth = halfWidth - halfHole
@@ -484,21 +560,23 @@ local function spawnGoal()
 		part.Anchored = true
 		part.Parent = model
 	end
+
+	-- 上下
 	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, -zOffset))
 	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, zOffset))
+	-- 左右 (隙間埋め)
 	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(-xOffset, 0, 0))
 	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(xOffset, 0, 0))
 
-	-- 3. カップの底を四角形(Block)に変更
+	-- 3. ★修正: カップの底を四角形(Block)に変更してフィットさせる
 	local cupBottom = Instance.new("Part")
 	cupBottom.Name = "CupBottom"
-	cupBottom.Shape = Enum.PartType.Block -- ★Blockに変更
+	cupBottom.Shape = Enum.PartType.Block -- Blockに変更
 	cupBottom.Size = Vector3.new(HOLE_SIZE * 0.95, 0.2, HOLE_SIZE * 0.95) -- 正方形
 	cupBottom.Color = Palette.Entity.GoalCup
 	cupBottom.Material = Enum.Material.Plastic
 	cupBottom.Anchored = true
 	cupBottom.CanCollide = true
-	-- 位置調整 (向きの回転は不要)
 	cupBottom.CFrame = CFrame.new(currentGoalPos) * CFrame.new(0, -GOAL_THICKNESS / 2 + 0.1, 0)
 	cupBottom.Parent = model
 
@@ -586,4 +664,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Goal is now stable square hole with square cup bottom")
+print("GameManager Updated: Stable Square Goal and Cup Bottom")
