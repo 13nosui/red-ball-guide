@@ -33,7 +33,6 @@ local function createDottedLine(startPos, endPos)
 		part.Anchored = true
 		part.CanCollide = false
 		part.CastShadow = false
-		-- ★追加: マウス判定を無効化
 		part.CanQuery = false
 		part.Material = Enum.Material.Neon
 		part.Color = Color3.fromRGB(100, 255, 255)
@@ -95,11 +94,11 @@ local function drawTutorialGhosts(stageData)
 				part.Color = Color3.new(0.8, 0.8, 0.8)
 			end
 
-			part.Transparency = 0.1
+			-- ★修正: 透明度を固定 (アニメーションなし)
+			part.Transparency = 0.4
 			part.Anchored = true
 			part.CanCollide = false
 			part.CastShadow = false
-			-- ★追加: マウス判定を無効化（これが重要）
 			part.CanQuery = false
 
 			local rot = blockInfo.Rotation
@@ -109,19 +108,19 @@ local function drawTutorialGhosts(stageData)
 			local highlight = Instance.new("Highlight")
 			highlight.FillColor = part.Color
 			highlight.OutlineColor = Color3.new(1, 1, 1)
-			highlight.FillTransparency = 0.2
+			-- ★修正: 塗りつぶしも少し薄めに固定
+			highlight.FillTransparency = 0.6
 			highlight.OutlineTransparency = 0
 			highlight.Parent = part
 
-			local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-			TweenService:Create(part, tweenInfo, { Transparency = 0.4 }):Play()
+			-- ★修正: 点滅アニメーション(Tween)を削除
 
 			part.Parent = tutorialFolder
 		end
 	end
 
 	if #stageData.TutorialBlocks > 0 then
-		print("VisualEffectController: Tutorial Ghosts Drawn (Click-through)")
+		print("VisualEffectController: Tutorial Ghosts Drawn (Static)")
 	end
 end
 
@@ -130,4 +129,4 @@ UpdateStageEvent.OnClientEvent:Connect(function(index, data)
 	drawTutorialGhosts(data)
 end)
 
-print("VisualEffectController Loaded with Non-Blocking Ghosts")
+print("VisualEffectController Loaded with Static Ghosts")
