@@ -18,42 +18,42 @@ local GOAL_WIDTH = 12
 local MAGNET_RADIUS = HOLE_SIZE * 2.5
 local MAX_CAPTURE_SPEED = 60
 
+-- ★AIアシスト設定 (修正: より自然な挙動へ)
+local AI_ASSIST_RANGE = 8
+-- 修正: 補正力を大幅に下げる (20 -> 4) : 風のような微調整レベルにする
+local AI_CORRECTION_POWER = 4
+-- 修正: 自動推進力を削除 (10 -> 0) : 重力のみで転がらせる
+local AI_PROPULSION_POWER = 0
+
 -- ■ ステージデータ
 local STAGE_DATA = {
-	-- Stage 1: 直進
 	[1] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(0, -2, -25),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -25) },
 		Fans = {},
 		TutorialBlocks = {
-			-- ★修正: 1つだけ表示
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 0), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
-	-- Stage 2: 90度反射
 	[2] = {
 		Start = Vector3.new(0, 15, 0),
 		Goal = Vector3.new(20, -2, -20),
 		Waypoints = { Vector3.new(0, 15, 0), Vector3.new(0, 2, 0), Vector3.new(0, 2, -20), Vector3.new(20, 2, -20) },
 		Fans = {},
 		TutorialBlocks = {
-			-- ★修正: スタート用は消し、最も重要な「反射用ブロック」1つだけを表示
 			{ Type = "Block", Position = Vector3.new(0, 2, -20), Rotation = Vector3.new(0, 45, 0) },
 		},
 	},
-	-- Stage 3: 長距離坂道
 	[3] = {
 		Start = Vector3.new(0, 30, 20),
 		Goal = Vector3.new(0, -2, -30),
 		Waypoints = { Vector3.new(0, 30, 20), Vector3.new(0, 2, 20), Vector3.new(0, 2, 0), Vector3.new(0, 2, -30) },
 		Fans = {},
 		TutorialBlocks = {
-			-- ★修正: 着地点のWedge 1つだけを表示
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 20), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
-	-- Stage 4: 扇風機
 	[4] = {
 		Start = Vector3.new(0, 15, 30),
 		Goal = Vector3.new(0, -2, -30),
@@ -67,11 +67,9 @@ local STAGE_DATA = {
 			},
 		},
 		TutorialBlocks = {
-			-- ★修正: スタートのWedge 1つだけを表示
 			{ Type = "Wedge", Position = Vector3.new(0, 2, 30), Rotation = Vector3.new(0, 0, 0) },
 		},
 	},
-	-- Stage 5: 風×ジャンプ
 	[5] = {
 		Start = Vector3.new(-20, 15, 0),
 		Goal = Vector3.new(20, 10, 0),
@@ -85,8 +83,6 @@ local STAGE_DATA = {
 			},
 		},
 		TutorialBlocks = {
-			-- ★修正: ギミックの核となる「ジャンプ台」1つだけを表示
-			-- (スタート用の坂はユーザーに考えてもらう)
 			{ Type = "Wedge", Position = Vector3.new(15, 2, 0), Rotation = Vector3.new(0, 90, 0) },
 		},
 	},
@@ -107,11 +103,22 @@ local startGame
 local loadStage
 local clearUserBlocks
 
--- ■ 風処理
+-- ■ ヘルパー関数
+local function getClosestPointOnSegment(point, a, b)
+	local ab = b - a
+	local ap = point - a
+	local t = ap:Dot(ab) / ab:Dot(ab)
+	t = math.clamp(t, 0, 1)
+	return a + ab * t
+end
+
+-- ■ 物理処理
 RunService.Heartbeat:Connect(function(dt)
-	if not currentBall or currentBall.Anchored then
+	if not currentBall or currentBall.Anchored or isGoalLocked then
 		return
 	end
+
+	-- 1. 風の処理
 	for _, zoneData in ipairs(activeWindZones) do
 		local zonePart = zoneData.Part
 		local direction = zoneData.Direction
@@ -124,6 +131,42 @@ RunService.Heartbeat:Connect(function(dt)
 			and math.abs(relPos.Z) <= size.Z / 2
 		then
 			currentBall.AssemblyLinearVelocity = currentBall.AssemblyLinearVelocity + (direction * power * dt)
+		end
+	end
+
+	-- 2. AI Navigation Assist (弱めた補正)
+	local data = STAGE_DATA[currentStageIndex]
+	if data and data.Waypoints and #data.Waypoints >= 2 then
+		local ballPos = currentBall.Position
+		local closestDist = math.huge
+		local targetPoint = nil
+		local targetDir = nil
+
+		for i = 1, #data.Waypoints - 1 do
+			local p1 = data.Waypoints[i]
+			local p2 = data.Waypoints[i + 1]
+			if p2.Y < 5 then
+				p2 = Vector3.new(p2.X, 2, p2.Z)
+			end
+
+			local closest = getClosestPointOnSegment(ballPos, p1, p2)
+			local dist = (ballPos - closest).Magnitude
+
+			if dist < closestDist then
+				closestDist = dist
+				targetPoint = closest
+				targetDir = (p2 - p1).Unit
+			end
+		end
+
+		if closestDist < AI_ASSIST_RANGE and targetPoint then
+			-- 修正: 推進力をゼロにし、補正力も弱めることで自然な転がりを優先
+			local correctionVec = (targetPoint - ballPos) * AI_CORRECTION_POWER * dt
+
+			-- 補正は水平方向のみに限定し、落下の邪魔をしない
+			correctionVec = Vector3.new(correctionVec.X, 0, correctionVec.Z)
+
+			currentBall.AssemblyLinearVelocity = currentBall.AssemblyLinearVelocity + correctionVec
 		end
 	end
 end)
@@ -475,4 +518,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: 1 Ghost Block per Stage & No Dupes")
+print("GameManager Updated: Natural Physics with Slight Assist")
