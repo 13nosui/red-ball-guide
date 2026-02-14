@@ -9,7 +9,6 @@ local Palette = require(Shared:WaitForChild("Palette"))
 
 local GameControlEvent = require(Events.GameControlEvent)
 local UpdateStageEvent = require(Events.UpdateStageEvent)
--- ★追加: ブロック配置用イベント読み込み (BlockManagerを統合)
 local PlaceBlockEvent = require(Events:WaitForChild("PlaceBlockEvent"))
 local UpdateBlockEvent = require(Events:WaitForChild("UpdateBlockEvent"))
 
@@ -54,14 +53,14 @@ local STAGE_DATA = {
 		Start = Vector3.new(0, 15, 32),
 		Goal = Vector3.new(0, -2, -32),
 		Waypoints = { Vector3.new(0, 15, 32), Vector3.new(0, 2, 32), Vector3.new(0, 2, -32) },
-		Fans = {}, -- ★修正: ステージファンを空に。プレイヤーがファンを配置する。
+		Fans = {},
 		TutorialBlocks = {},
 	},
 	[5] = {
 		Start = Vector3.new(-20, 15, 0),
 		Goal = Vector3.new(20, 10, 0),
 		Waypoints = { Vector3.new(-20, 15, 0), Vector3.new(-20, 2, 0), Vector3.new(16, 2, 0), Vector3.new(20, 10, 0) },
-		Fans = {}, -- ★修正: ステージファンを空に。
+		Fans = {},
 		TutorialBlocks = {},
 	},
 }
@@ -90,9 +89,8 @@ local function getClosestPointOnSegment(point, a, b)
 	return a + ab * t
 end
 
--- ■ 物理処理ループ (風の処理含む)
+-- ■ 物理処理ループ
 RunService.Heartbeat:Connect(function(dt)
-	-- 不要な風ゾーン(削除されたファン)の掃除
 	for i = #activeWindZones, 1, -1 do
 		local zone = activeWindZones[i]
 		if not zone.Part or not zone.Part.Parent then
@@ -107,9 +105,8 @@ RunService.Heartbeat:Connect(function(dt)
 	-- 1. 風の処理
 	for _, zoneData in ipairs(activeWindZones) do
 		local zonePart = zoneData.Part
-		-- ファンモデル自体が動く(回転する)可能性があるので、方向は毎回計算
 		local direction = zonePart.CFrame.LookVector
-		local power = zoneData.Power or 60 -- デフォルトパワー
+		local power = zoneData.Power or 60
 
 		local relPos = zonePart.CFrame:PointToObjectSpace(currentBall.Position)
 		local size = zonePart.Size
@@ -159,7 +156,7 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
--- ■ 扇風機生成 (汎用: ステージ＆ユーザー)
+-- ■ 扇風機生成
 local function spawnFan(position, rotation, isUserBlock)
 	local model = Instance.new("Model")
 	model.Name = "FanModel"
@@ -171,20 +168,17 @@ local function spawnFan(position, rotation, isUserBlock)
 	housing.Material = Enum.Material.Metal
 	housing.Anchored = true
 	housing.CanCollide = false
-	housing.CanQuery = true -- クリック選択可能に
+	housing.CanQuery = true
 
-	-- 回転の適用
 	local baseCFrame = CFrame.new(position)
 	if typeof(rotation) == "Vector3" then
 		baseCFrame = baseCFrame * CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
 	elseif typeof(rotation) == "CFrame" then
-		baseCFrame = rotation -- CFrameそのものが渡された場合
+		baseCFrame = rotation
 	else
-		-- デフォルト向き
 		baseCFrame = baseCFrame * CFrame.Angles(0, math.rad(90), 0)
 	end
 
-	-- Cylinderは横向きがデフォなので、前方を向くように調整
 	housing.CFrame = baseCFrame * CFrame.Angles(0, math.rad(90), 0)
 	housing.Parent = model
 
@@ -212,7 +206,6 @@ local function spawnFan(position, rotation, isUserBlock)
 		end
 	end)
 
-	-- 風の当たり判定エリア (前方に伸ばす)
 	local zone = Instance.new("Part")
 	zone.Name = "WindZone"
 	zone.Size = Vector3.new(8, 8, 20)
@@ -222,8 +215,7 @@ local function spawnFan(position, rotation, isUserBlock)
 	zone.Anchored = true
 	zone.CanCollide = false
 	zone.CanQuery = false
-	-- CylinderのCFrame基準だと、LookVector方向はRightVectorになる等の癖があるため、baseCFrame(向き)基準で配置
-	zone.CFrame = baseCFrame * CFrame.new(0, 0, -12) -- 前方へオフセット
+	zone.CFrame = baseCFrame * CFrame.new(0, 0, -12)
 	zone.Parent = model
 
 	local attachment = Instance.new("Attachment", housing)
@@ -238,7 +230,7 @@ local function spawnFan(position, rotation, isUserBlock)
 	particle.Parent = attachment
 
 	if isUserBlock then
-		model.Name = "PlacedBlock_Fan" -- 識別用プレフィックス
+		model.Name = "PlacedBlock_Fan"
 		model.PrimaryPart = housing
 		local folder = workspace:FindFirstChild("PlacedBlocks") or Instance.new("Folder", workspace)
 		folder.Name = "PlacedBlocks"
@@ -251,17 +243,15 @@ local function spawnFan(position, rotation, isUserBlock)
 	return model
 end
 
--- ■ ブロック配置処理 (統合済み)
+-- ■ ブロック配置処理
 PlaceBlockEvent.OnServerEvent:Connect(function(player, blockType, position, rotation)
 	print("Placing:", blockType)
 
-	-- ファンの配置
 	if blockType == "Fan" then
 		spawnFan(position, rotation, true)
 		return
 	end
 
-	-- 通常ブロックの配置
 	local newBlock
 	if blockType == "Block" then
 		newBlock = Instance.new("Part")
@@ -286,7 +276,6 @@ PlaceBlockEvent.OnServerEvent:Connect(function(player, blockType, position, rota
 		newBlock.Material = Enum.Material.Plastic
 		newBlock.Color = Palette.BlockColors[blockType] or Color3.new(0.8, 0.8, 0.8)
 
-		-- 回転の適用
 		if typeof(rotation) == "Vector3" then
 			newBlock.CFrame = CFrame.new(position)
 				* CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
@@ -300,16 +289,14 @@ PlaceBlockEvent.OnServerEvent:Connect(function(player, blockType, position, rota
 	end
 end)
 
--- ■ ブロック操作処理 (移動・回転・削除)
+-- ■ ブロック操作処理
 UpdateBlockEvent.OnServerEvent:Connect(function(player, block, action, value)
 	if not block or not block.Parent then
 		return
 	end
-
-	-- モデル(Fan)の場合の対応
 	local target = block
 	if block.Parent:IsA("Model") then
-		target = block.Parent -- モデルごと操作
+		target = block.Parent
 	end
 
 	if action == "move" then
@@ -333,10 +320,7 @@ UpdateBlockEvent.OnServerEvent:Connect(function(player, block, action, value)
 		end
 	elseif action == "delete" then
 		target:Destroy()
-		-- activeWindZonesはHeartbeat内で自動クリーンアップされる
 	end
-
-	-- 更新通知
 	UpdateBlockEvent:FireAllClients(target)
 end)
 
@@ -469,6 +453,7 @@ spawnBall = function()
 	return ball
 end
 
+-- ■ ゴール生成 (修正版: 4つのパーツで枠を作る)
 local function spawnGoal()
 	local existingGoal = workspace:FindFirstChild("GoalModel")
 	if existingGoal then
@@ -477,91 +462,75 @@ local function spawnGoal()
 	local model = Instance.new("Model")
 	model.Name = "GoalModel"
 	model.Parent = workspace
+
+	-- 地面の穴あけ
 	createFloorWithGap(currentGoalPos, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
-	local basePart = Instance.new("Part")
-	basePart.Name = "Base"
-	basePart.Size = Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH)
-	basePart.CFrame = CFrame.new(currentGoalPos)
-	basePart.Color = Palette.Entity.GoalBase
-	basePart.Material = Enum.Material.Grass
-	basePart.Anchored = true
-	basePart.Parent = workspace
-	local holeCutter = Instance.new("Part")
-	holeCutter.Name = "Cutter"
-	holeCutter.Shape = Enum.PartType.Cylinder
-	holeCutter.CFrame = basePart.CFrame * CFrame.Angles(0, 0, math.rad(90))
-	holeCutter.Size = Vector3.new(GOAL_THICKNESS * 2, HOLE_SIZE, HOLE_SIZE)
-	holeCutter.Parent = workspace
-	local success, result = pcall(function()
-		return basePart:SubtractAsync({ holeCutter }, Enum.CollisionFidelity.PreciseConvexDecomposition)
-	end)
-	if success and result then
-		local unionGoal = result
-		unionGoal.Name = "GoalCup"
-		unionGoal.Anchored = true
-		unionGoal.Parent = model
-		basePart:Destroy()
-		holeCutter:Destroy()
-		local cupBottom = Instance.new("Part")
-		cupBottom.Name = "CupBottom"
-		cupBottom.Shape = Enum.PartType.Cylinder
-		cupBottom.Size = Vector3.new(0.2, HOLE_SIZE * 0.95, HOLE_SIZE * 0.95)
-		cupBottom.Color = Palette.Entity.GoalCup
-		cupBottom.Material = Enum.Material.Plastic
-		cupBottom.Anchored = true
-		cupBottom.CanCollide = true
-		cupBottom.CFrame = unionGoal.CFrame
-			* CFrame.Angles(0, 0, math.rad(90))
-			* CFrame.new(-GOAL_THICKNESS / 2 + 0.2, 0, 0)
-		cupBottom.Parent = model
-		local magnet = Instance.new("Part")
-		magnet.Name = "MagnetSensor"
-		magnet.Shape = Enum.PartType.Cylinder
-		magnet.Size = Vector3.new(1, MAGNET_RADIUS, MAGNET_RADIUS)
-		magnet.CFrame = unionGoal.CFrame * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(1, 0, 0)
-		magnet.Transparency = 1
-		magnet.CanCollide = false
-		magnet.Anchored = true
-		magnet.Parent = model
-		magnet.CanQuery = false
-		magnet.Touched:Connect(function(hit)
-			if isGoalLocked then
-				return
-			end
-			if hit.Name == "RedBall" and hit.AssemblyLinearVelocity.Magnitude < MAX_CAPTURE_SPEED then
-				captureBallIntoHole(hit, Vector3.new(currentGoalPos.X, 0, currentGoalPos.Z))
-			end
-		end)
-		local pole = Instance.new("Part")
-		pole.Name = "Pole"
-		pole.Size = Vector3.new(0.4, 12, 0.4)
-		pole.Shape = Enum.PartType.Cylinder
-		pole.Color = Palette.Entity.GoalPole
-		pole.Anchored = true
-		pole.CanCollide = false
-		pole.CFrame = CFrame.new(currentGoalPos.X, 0 + 6, currentGoalPos.Z - 4)
-		pole.Parent = model
-		local flag = Instance.new("Part")
-		flag.Name = "Flag"
-		flag.Size = Vector3.new(0.2, 3, 4)
-		flag.Color = Palette.Entity.GoalFlag
-		flag.Anchored = true
-		flag.CanCollide = false
-		flag.CFrame = pole.CFrame * CFrame.new(0, 4, -2)
-		flag.Parent = model
-	else
-		warn("Failed to create goal geometry:", result)
-		basePart.Parent = model
-		if holeCutter then
-			holeCutter:Destroy()
-		end
+
+	-- ★修正: Unionを使わず、4つのパーツで四角い穴を作る
+	local halfWidth = GOAL_WIDTH / 2
+	local halfHole = HOLE_SIZE / 2
+	local stripWidth = halfWidth - halfHole -- 枠の幅
+	local zOffset = halfHole + (stripWidth / 2)
+	local xOffset = halfHole + (stripWidth / 2)
+
+	local function createStrip(size, offset)
+		local part = Instance.new("Part")
+		part.Name = "GoalFramePart"
+		part.Size = size
+		part.CFrame = CFrame.new(currentGoalPos) * offset
+		part.Color = Palette.Entity.GoalBase
+		part.Material = Enum.Material.Grass
+		part.Anchored = true
+		part.Parent = model
 	end
+
+	-- 上下の枠 (全幅)
+	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, -zOffset))
+	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, zOffset))
+
+	-- 左右の枠 (隙間埋め)
+	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(-xOffset, 0, 0))
+	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(xOffset, 0, 0))
+
+	-- カップの底 (見た目)
+	local cupBottom = Instance.new("Part")
+	cupBottom.Name = "CupBottom"
+	cupBottom.Shape = Enum.PartType.Cylinder
+	cupBottom.Size = Vector3.new(0.2, HOLE_SIZE * 0.95, HOLE_SIZE * 0.95)
+	cupBottom.Color = Palette.Entity.GoalCup
+	cupBottom.Material = Enum.Material.Plastic
+	cupBottom.Anchored = true
+	cupBottom.CanCollide = true
+	-- 向き調整
+	cupBottom.CFrame = CFrame.new(currentGoalPos)
+		* CFrame.Angles(0, 0, math.rad(90))
+		* CFrame.new(-GOAL_THICKNESS / 2 + 0.2, 0, 0)
+	cupBottom.Parent = model
+
+	-- 判定用センサー
+	local magnet = Instance.new("Part")
+	magnet.Name = "MagnetSensor"
+	magnet.Shape = Enum.PartType.Cylinder
+	magnet.Size = Vector3.new(1, MAGNET_RADIUS, MAGNET_RADIUS)
+	magnet.CFrame = CFrame.new(currentGoalPos) * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(1, 0, 0)
+	magnet.Transparency = 1
+	magnet.CanCollide = false
+	magnet.Anchored = true
+	magnet.Parent = model
+	magnet.CanQuery = false
+	magnet.Touched:Connect(function(hit)
+		if isGoalLocked then
+			return
+		end
+		if hit.Name == "RedBall" and hit.AssemblyLinearVelocity.Magnitude < MAX_CAPTURE_SPEED then
+			captureBallIntoHole(hit, Vector3.new(currentGoalPos.X, 0, currentGoalPos.Z))
+		end
+	end)
 end
 
 loadStage = function(index)
 	isGoalLocked = false
 	currentStageIndex = index
-	-- ステージ切り替え時は全ファンを消去 (activeWindZonesもリセット)
 	for _, zone in ipairs(activeWindZones) do
 		if zone.Part and zone.Part.Parent and zone.Part.Parent.Parent then
 			zone.Part.Parent:Destroy()
@@ -577,7 +546,6 @@ loadStage = function(index)
 		clearUserBlocks()
 		spawnGoal()
 		spawnBall()
-		-- ステージ固定ファンがあればここで生成
 		if data.Fans then
 			for _, fanData in ipairs(data.Fans) do
 				spawnFan(fanData.Position, CFrame.lookAt(Vector3.zero, fanData.Direction), false)
@@ -623,4 +591,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Fan Block Added & Block Manager Integrated")
+print("GameManager Updated: Fixed Invisible Goal Bug")
