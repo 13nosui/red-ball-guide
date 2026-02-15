@@ -417,7 +417,7 @@ clearUserBlocks = function()
 	end
 end
 
--- ★修正: ステージの床を明るくポップなデザインに
+-- ★修正: 穴あき床生成 (4分割方式 - 確実に穴を空ける)
 local function createFloorWithGap(gapPosition, gapSize)
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if baseplate then
@@ -433,11 +433,12 @@ local function createFloorWithGap(gapPosition, gapSize)
 	local FLOOR_THICKNESS = 4
 	local Y_POS = -2
 
+	-- テクスチャ適用関数
 	local function addGridTexture(part)
 		local texture = Instance.new("Texture")
 		texture.Face = Enum.NormalId.Top
 		texture.Texture = "rbxassetid://6372755229"
-		texture.Color3 = Color3.fromRGB(150, 200, 255) -- パステルブルーのグリッド
+		texture.Color3 = Color3.fromRGB(150, 200, 255)
 		texture.Transparency = 0.6
 		texture.StudsPerTileU = 4
 		texture.StudsPerTileV = 4
@@ -448,45 +449,55 @@ local function createFloorWithGap(gapPosition, gapSize)
 		texture.Parent = part
 	end
 
-	local gx, gz = gapPosition.X, gapPosition.Z
-	local gw, gd = gapSize.X, gapSize.Z
+	-- 床パーツ生成関数
 	local function makeFloor(name, size, pos)
 		local p = Instance.new("Part")
 		p.Name = name
 		p.Size = size
 		p.Position = pos
 		p.Anchored = true
-		p.Color = Color3.fromRGB(250, 250, 255) -- ほぼ白に近いクリーム色
+		p.Color = Color3.fromRGB(250, 250, 255)
 		p.Material = Enum.Material.SmoothPlastic
 		addGridTexture(p)
 		p.Parent = floorModel
 	end
 
-	local northSizeZ = (WORLD_SIZE / 2) - (math.abs(gz) + gd / 2)
+	local gx, gz = gapPosition.X, gapPosition.Z
+	local gw, gd = gapSize.X, gapSize.Z
+	local worldMin, worldMax = -WORLD_SIZE / 2, WORLD_SIZE / 2
+
+	-- 穴の境界
+	local gapMinX, gapMaxX = gx - gw / 2, gx + gw / 2
+	local gapMinZ, gapMaxZ = gz - gd / 2, gz + gd / 2
+
+	-- 1. 北側 (奥)
+	local northSizeZ = worldMax - gapMaxZ
 	if northSizeZ > 0 then
-		makeFloor(
-			"FloorNorth",
-			Vector3.new(WORLD_SIZE, FLOOR_THICKNESS, northSizeZ),
-			Vector3.new(0, Y_POS, (gz - gd / 2) - northSizeZ / 2)
-		)
+		local posZ = gapMaxZ + northSizeZ / 2
+		makeFloor("FloorNorth", Vector3.new(WORLD_SIZE, FLOOR_THICKNESS, northSizeZ), Vector3.new(0, Y_POS, posZ))
 	end
-	local southStart = gz + gd / 2
-	local sSizeZ = (WORLD_SIZE / 2) - southStart
-	makeFloor(
-		"FloorSouth",
-		Vector3.new(WORLD_SIZE, FLOOR_THICKNESS, sSizeZ),
-		Vector3.new(0, Y_POS, southStart + sSizeZ / 2)
-	)
-	local westEnd = gx - gw / 2
-	local wSizeX = westEnd - (-WORLD_SIZE / 2)
-	makeFloor(
-		"FloorWest",
-		Vector3.new(wSizeX, FLOOR_THICKNESS, gd),
-		Vector3.new((-WORLD_SIZE / 2) + wSizeX / 2, Y_POS, gz)
-	)
-	local eastStart = gx + gw / 2
-	local eSizeX = (WORLD_SIZE / 2) - eastStart
-	makeFloor("FloorEast", Vector3.new(eSizeX, FLOOR_THICKNESS, gd), Vector3.new(eastStart + eSizeX / 2, Y_POS, gz))
+
+	-- 2. 南側 (手前)
+	local southSizeZ = gapMinZ - worldMin
+	if southSizeZ > 0 then
+		local posZ = worldMin + southSizeZ / 2
+		makeFloor("FloorSouth", Vector3.new(WORLD_SIZE, FLOOR_THICKNESS, southSizeZ), Vector3.new(0, Y_POS, posZ))
+	end
+
+	-- 3. 西側 (左 - 穴のZ範囲のみ)
+	local westSizeX = gapMinX - worldMin
+	if westSizeX > 0 then
+		local posX = worldMin + westSizeX / 2
+		makeFloor("FloorWest", Vector3.new(westSizeX, FLOOR_THICKNESS, gd), Vector3.new(posX, Y_POS, gz))
+	end
+
+	-- 4. 東側 (右 - 穴のZ範囲のみ)
+	local eastSizeX = worldMax - gapMaxX
+	if eastSizeX > 0 then
+		local posX = gapMaxX + eastSizeX / 2
+		makeFloor("FloorEast", Vector3.new(eastSizeX, FLOOR_THICKNESS, gd), Vector3.new(posX, Y_POS, gz))
+	end
+
 	floorModel.Parent = workspace
 end
 
@@ -509,6 +520,7 @@ spawnBall = function()
 	return ball
 end
 
+-- ★修正: ゴール生成 (4分割フレーム + 底板)
 local function spawnGoal()
 	local existingGoal = workspace:FindFirstChild("GoalModel")
 	if existingGoal then
@@ -517,12 +529,16 @@ local function spawnGoal()
 	local model = Instance.new("Model")
 	model.Name = "GoalModel"
 	model.Parent = workspace
+
+	-- 床に穴を開ける
 	createFloorWithGap(currentGoalPos, Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, GOAL_WIDTH))
+
 	local halfWidth = GOAL_WIDTH / 2
 	local halfHole = HOLE_SIZE / 2
 	local stripWidth = halfWidth - halfHole
 	local zOffset = halfHole + (stripWidth / 2)
 	local xOffset = halfHole + (stripWidth / 2)
+
 	local function createStrip(size, offset)
 		local part = Instance.new("Part")
 		part.Name = "GoalFramePart"
@@ -533,10 +549,14 @@ local function spawnGoal()
 		part.Anchored = true
 		part.Parent = model
 	end
+
+	-- 枠を作成
 	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, -zOffset))
 	createStrip(Vector3.new(GOAL_WIDTH, GOAL_THICKNESS, stripWidth), CFrame.new(0, 0, zOffset))
 	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(-xOffset, 0, 0))
 	createStrip(Vector3.new(stripWidth, GOAL_THICKNESS, HOLE_SIZE), CFrame.new(xOffset, 0, 0))
+
+	-- 底板を作成
 	local cupBottom = Instance.new("Part")
 	cupBottom.Name = "CupBottom"
 	cupBottom.Shape = Enum.PartType.Block
@@ -547,6 +567,8 @@ local function spawnGoal()
 	cupBottom.CanCollide = true
 	cupBottom.CFrame = CFrame.new(currentGoalPos) * CFrame.new(0, -GOAL_THICKNESS / 2 + 0.1, 0)
 	cupBottom.Parent = model
+
+	-- センサー
 	local magnet = Instance.new("Part")
 	magnet.Name = "MagnetSensor"
 	magnet.Shape = Enum.PartType.Cylinder
@@ -634,4 +656,4 @@ GameControlEvent.OnServerEvent:Connect(function(player, action)
 	end
 end)
 
-print("GameManager Updated: Pop Floor Design")
+print("GameManager Updated: Bulletproof Floor Gap & Stable Goal")

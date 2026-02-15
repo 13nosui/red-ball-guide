@@ -54,8 +54,8 @@ editFrame.Size = UDim2.new(1, 0, 1, 0)
 editFrame.BackgroundTransparency = 1
 editFrame.Parent = screenGui
 
--- ポップスタイル (不透明・太い縁取り)
-local function applyPopStyle(guiObject, cornerRadius, isContainer)
+-- ★修正: スタイル適用関数 (色を引数で受け取るように変更)
+local function applyPopStyle(guiObject, cornerRadius, isContainer, baseColor)
 	guiObject.BorderSizePixel = 0
 
 	local corner = guiObject:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
@@ -67,58 +67,73 @@ local function applyPopStyle(guiObject, cornerRadius, isContainer)
 	stroke.Parent = guiObject
 
 	if isContainer then
+		-- コンテナ用: 半透明ダーク
 		guiObject.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 		guiObject.BackgroundTransparency = 0.4
 		stroke.Thickness = 0
 		stroke.Transparency = 1
 	else
-		-- ボタン用
-		guiObject.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		guiObject.BackgroundTransparency = 0
+		-- ボタン用: 指定色 or 白
+		local color = baseColor or Color3.fromRGB(255, 255, 255)
+		guiObject.BackgroundColor3 = color
+		guiObject.BackgroundTransparency = 0 -- 不透明
 
+		-- 枠線 (コミック風)
 		stroke.Color = Color3.fromRGB(40, 40, 60)
 		stroke.Thickness = 3
 		stroke.Transparency = 0
 
+		-- ホバーアニメーション
 		if guiObject:IsA("GuiButton") then
-			local originalColor = guiObject.BackgroundColor3
 			guiObject.MouseEnter:Connect(function()
-				TweenService:Create(guiObject, TweenInfo.new(0.2), { Size = guiObject.Size + UDim2.new(0, 4, 0, 4) })
-					:Play()
+				-- 少し拡大 + 少し明るく
+				TweenService:Create(guiObject, TweenInfo.new(0.2), {
+					Size = guiObject.Size + UDim2.new(0, 4, 0, 4),
+				}):Play()
 			end)
+
 			guiObject.MouseLeave:Connect(function()
-				TweenService:Create(guiObject, TweenInfo.new(0.2), { Size = guiObject.Size - UDim2.new(0, 0, 0, 0) })
-					:Play()
-				TweenService:Create(guiObject, TweenInfo.new(0.2), { BackgroundColor3 = originalColor }):Play()
+				-- 元のサイズ + 元の色に戻す
+				TweenService:Create(guiObject, TweenInfo.new(0.2), {
+					Size = guiObject.Size - UDim2.new(0, 0, 0, 0),
+					BackgroundColor3 = color, -- ★ここで正しい色に戻す
+				}):Play()
 			end)
 		end
 	end
 end
 
--- ★修正: Next Stage ボタン
+-- 明るさ判定関数 (HIG準拠のコントラスト確保用)
+local function isColorBright(color)
+	-- 輝度計算 (R*0.299 + G*0.587 + B*0.114)
+	return (color.R * 0.299 + color.G * 0.587 + color.B * 0.114) > 0.6
+end
+
+-- Next Stage ボタン (緑色にして強調)
 local btnNext = Instance.new("TextButton")
 btnNext.Name = "ButtonNext"
 btnNext.Size = UDim2.new(0, 200, 0, 60)
 btnNext.Position = UDim2.new(0.5, 0, 0.6, 0)
 btnNext.AnchorPoint = Vector2.new(0.5, 0.5)
 btnNext.Text = "Next Stage"
--- 文字色を濃い色にして視認性を確保
-btnNext.TextColor3 = Color3.fromRGB(40, 40, 60)
 btnNext.Font = Enum.Font.FredokaOne
 btnNext.TextSize = 24
 btnNext.TextTransparency = 1
 btnNext.Parent = resultFrame
-applyPopStyle(btnNext, 30)
--- 背景色を白に固定 (緑ではなく白ベースのポップスタイルに統一)
-btnNext.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-btnNext.BackgroundTransparency = 1 -- 初期は透明
+
+local nextBtnColor = Palette.System.Success -- 緑
+-- ボタン色適用
+applyPopStyle(btnNext, 30, false, nextBtnColor)
+-- テキスト色自動設定 (背景が明るければ黒、暗ければ白)
+btnNext.TextColor3 = isColorBright(nextBtnColor) and Color3.fromRGB(40, 40, 60) or Color3.fromRGB(255, 255, 255)
+btnNext.BackgroundTransparency = 1 -- 初期は非表示アニメ用
 
 local drawerFrame = Instance.new("Frame")
 drawerFrame.Name = "DrawerMenu"
 drawerFrame.Size = UDim2.new(0, 100, 0.7, 0)
 drawerFrame.Position = UDim2.new(0, 20, 0.15, 0)
 drawerFrame.Parent = editFrame
-applyPopStyle(drawerFrame, 20, true)
+applyPopStyle(drawerFrame, 20, true) -- コンテナとして適用
 
 local drawerLayout = Instance.new("UIListLayout")
 drawerLayout.Padding = UDim.new(0, 20)
@@ -131,7 +146,7 @@ local function create3DButton(name, blockType, parent)
 	btn.Name = name
 	btn.Size = UDim2.new(0, 70, 0, 70)
 	btn.Parent = parent
-	applyPopStyle(btn, 20)
+	applyPopStyle(btn, 20) -- 白ボタンとして適用
 
 	local viewport = Instance.new("ViewportFrame")
 	viewport.Size = UDim2.new(0.8, 0, 0.8, 0)
@@ -233,14 +248,22 @@ local function createTextButton(name, text, parent, color, size, layoutOrder)
 	local defaultSize = UDim2.new(0, 50, 0, 50)
 	btn.Size = size or defaultSize
 	btn.Text = text
-	btn.TextColor3 = Color3.new(1, 1, 1)
+
+	-- ★修正: 背景色を渡してスタイル適用
+	applyPopStyle(btn, 25, false, color)
+
+	-- ★修正: 背景色に合わせてテキスト色を自動決定 (HIG推奨)
+	-- 明るい背景なら濃い文字、暗い背景なら白い文字
+	if isColorBright(color) then
+		btn.TextColor3 = Color3.fromRGB(40, 40, 60) -- Dark Navy
+	else
+		btn.TextColor3 = Color3.fromRGB(255, 255, 255) -- White
+	end
+
 	btn.Font = Enum.Font.FredokaOne
 	btn.TextSize = 16
 	btn.LayoutOrder = layoutOrder or 0
 	btn.Parent = parent
-	applyPopStyle(btn, 25)
-	btn.BackgroundColor3 = color
-	btn.BackgroundTransparency = 0
 	return btn
 end
 
@@ -297,6 +320,7 @@ actionLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 actionLayout.Padding = UDim.new(0, 15)
 actionLayout.Parent = actionPanel
 
+-- Start/Resetボタン (Startは緑、Resetは赤)
 local btnStart = createTextButton("ButtonStart", "Start", actionPanel, Palette.System.Success, UDim2.new(0, 70, 0, 50))
 local btnReset = createTextButton("ButtonReset", "Reset", actionPanel, Palette.System.Error, UDim2.new(0, 70, 0, 50))
 
@@ -378,7 +402,6 @@ StageClearEvent.OnClientEvent:Connect(function(stageIndex)
 	btnNext.BackgroundTransparency = 1
 	btnNext.TextTransparency = 1
 	task.wait(0.5)
-	-- ★修正: 出現時は完全に不透明(0)にする
 	local t2 = TweenService:Create(btnNext, TweenInfo.new(0.5), { BackgroundTransparency = 0, TextTransparency = 0 })
 	t2:Play()
 	spawnConfetti()
@@ -395,4 +418,4 @@ UpdateStageEvent.OnClientEvent:Connect(function(index, data)
 	stageLabel.Text = "STAGE: " .. string.format("%02d", index)
 end)
 
-print("UI Setup: Button Visibility Fixed")
+print("UI Setup: Button Contrast & Hover Logic Fixed (HIG Compliant)")
